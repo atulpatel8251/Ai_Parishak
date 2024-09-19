@@ -14,7 +14,7 @@ prompts
 Pillow
 langchain_community
 langchain_openai
-PyPDF2==3.0.0
+PyPDF2
 python-dotenv
 docxlatex
 docx2txt
@@ -29,5 +29,4 @@ pysqlite3-binary
 weaviate-client
 translate
 faiss-cpu
-pdfplumber
-pycryptodome==3.17
+
