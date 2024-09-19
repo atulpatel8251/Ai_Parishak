@@ -19,7 +19,7 @@ from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationChain
 from langchain.memory import ConversationBufferMemory
 import docx
-from prompts import ai_prompt,ai_topic_prompt,latex_prompt,student_prompt,mcq_test_prompt,learn_outcome_prompt,ai_topic_prompt1
+from prompts import ai_prompt,ai_topic_prompt,latex_prompt,student_prompt,mcq_test_prompt,learn_outcome_prompt,ai_topic_prompt1,ai_topic_prompt2
 from functions import read_word_table,create_word_doc,get_text
 import subprocess
 import re
