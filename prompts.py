@@ -265,6 +265,40 @@ master_prompt = """
                 Remember to not discuss about the context you have recieved and do not mention you are unable to access or read any documents 
 
                 """
+ai_topic_prompt2= """
+                    Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
+                    
+                    Terminal: {}
+                    language: {}
+                    Maximum Marks: 80 (shown in the top right corner)
+                    Question Paper Format:
+
+                    Objective Section
+
+                    Multiple Choice Questions (MCQs): 5 questions, each carrying 1 mark
+
+                    Each question should have 4 options (a, b, c, d) and test basic knowledge and understanding of the subject.
+
+                    Subjective Section
+
+                    Fill in the Blanks: 5 questions, each carrying 1 mark
+
+                    Assess specific knowledge related to the topic.
+                    True/False Statements: 5 questions, each carrying 1 mark
+
+                    Test students’ ability to identify the correctness of the statements.
+                    One-word Answers: 5 questions, each carrying 1 mark
+
+                    Test precise knowledge and terminology.
+                    Short Answer Questions: 5 questions, each carrying 5 marks
+
+                    Require brief but detailed responses.
+                    Long Answer Questions: 5 questions, each carrying 10 marks
+
+                    Require detailed explanations and in-depth understanding.                
+                
+                  """
+
 
 lang_prompt = """ Translate the below response to {} language . 
                   Remember to keep all the information as it is. Response - {}
