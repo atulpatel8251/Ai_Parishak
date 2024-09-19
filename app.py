@@ -644,7 +644,7 @@ if st.session_state.teach == 'Teachers':
                       mime="application/octet-stream",
                       key='worddownload3')
                                
-           if choose == "Question Paper Generator":
+            if choose == "Question Paper Generator":
                 subjects_folder = "./preuploaded"
 
                 # List subjects
