@@ -32,7 +32,6 @@ import base64
 import fixed_function
 from io import BytesIO
 import streamlit as st
-from PyPDF2 import PdfReader
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains.question_answering import load_qa_chain
