@@ -643,6 +643,93 @@ if st.session_state.teach == 'Teachers':
                       file_name="generated_document.docx", 
                       mime="application/octet-stream",
                       key='worddownload3')
+                               
+           if choose == "Question Paper Generator":
+                subjects_folder = "./preuploaded"
+
+                # List subjects
+                subjects_list = [d for d in os.listdir(subjects_folder) if os.path.isdir(os.path.join(subjects_folder, d))]
+                subjects_list.sort()
+                subjects_list.insert(0, "Select subject")
+
+                selected_subject = st.selectbox("Select a subject", subjects_list, index=0, key='subject_selector')
+
+                if selected_subject != "Select subject":
+                    # List chapters for the selected subject
+                    folder_path = os.path.join(subjects_folder, selected_subject)
+                    files_list = list_files(folder_path)
+                    files_list = [remove_extension(filename) for filename in files_list]
+                    files_list.sort()
+                    files_list.insert(0, "All Chapters")
+
+                    selected_file = st.selectbox("Select a chapter (optional)", files_list, index=0, key='chapter_selector')
+
+                    # Initialize text variable
+                    st.session_state.text = ""
+
+                    if selected_file == "All Chapters":
+                        for file in files_list[1:]:  # Skip "All Chapters" option
+                            pdf_file_path = os.path.join(folder_path, file + '.pdf')
+                            st.session_state.text += pdf_to_text(pdf_file_path) + "\n"
+                    elif selected_file != "Select chapter":
+                        st.session_state.filename = []
+                        pdf_file_path = os.path.join(folder_path, selected_file + '.pdf')
+                        st.session_state.filename.append(selected_file)
+                        st.session_state.text = pdf_to_text(pdf_file_path)
+
+                    if st.session_state.text:
+                        # Input settings
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.session_state.Terminal = st.selectbox('Exam Terminal*', ['1st Term', '2nd Term','Pre Board','Unit Test'], index=0, key="mode")
+                        with col2:
+                            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
+                        
+                        # Button to trigger processing
+                        if st.button("Submit"):
+                            if st.session_state.text and st.session_state.Terminal != 'Select Option':
+                                st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
+                                chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
+                                formatted_output = st.session_state.llm.predict(input=ai_topic_prompt2.format(
+                                    chapter_info,
+                                    st.session_state.Terminal,
+                                    st.session_state.language,
+                                ))
+
+                                st.info(formatted_output)
+                                
+                                # Define paths
+                                base_folder = './exam_uploaded'
+                                terminal_folder = os.path.join(base_folder, st.session_state.Terminal)
+
+                                # Create directories if they don't exist
+                                if not os.path.exists(base_folder):
+                                    os.makedirs(base_folder)
+                                if not os.path.exists(terminal_folder):
+                                    os.makedirs(terminal_folder)
+
+                                # Save the question paper as PDF
+                                pdf_file_path = os.path.join(terminal_folder, 'question.pdf')
+                                markdown_to_pdf(formatted_output, pdf_file_path)
+
+                                # Save the question paper as Word document
+                                word_doc = create_word_doc(formatted_output)
+                                word_file_path = os.path.join(terminal_folder, 'generated_document.docx')
+                                word_doc.save(word_file_path)
+                                
+                                # Provide download button for Word document
+                                doc_buffer = download_doc(word_doc)
+                                st.download_button(
+                                    label="Download Word Document",
+                                    data=doc_buffer,
+                                    file_name="generated_document.docx",
+                                    mime="application/octet-stream",
+                                    key='worddownload'
+                                )
+
+                                # Provide feedback about file saving
+                                st.success(f"{st.session_state.Terminal} Question paper uploaded successfully ")
+      
                     
 if st.session_state.teach=='Students':
     choose=st.radio("Select Options",("Pre Uploaded","Ask a Query","Text Analyzer"),horizontal=True)
