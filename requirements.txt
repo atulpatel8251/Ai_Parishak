@@ -30,4 +30,4 @@ weaviate-client
 translate
 faiss-cpu
 pdfplumber
-pycryptodome
+
