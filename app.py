@@ -371,7 +371,7 @@ if st.session_state.teach == 'Teachers':
                             st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Only Questions', 'Questions with Answers'], index=0, key="quesansw")
                         with col2:
                             st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Short Questions', 'Long Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0)
-                            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'English and Hindi'], index=0, key="lang")
+                            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
 
                         # Button to trigger processing
                         if st.button("Submit"):
