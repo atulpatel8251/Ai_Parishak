@@ -1,5 +1,4 @@
 import json
-import pdfplumber
 from langchain_community.llms import OpenAI
 import chat
 import openai
@@ -329,16 +328,6 @@ if st.session_state.teach == 'Teachers':
         choose = st.session_state.selected_option
 
         col_11, col_22 = st.columns([2, 1])
-        def pdf_to_text(pdf_path):
-            text = ""
-            try:
-                with pdfplumber.open(pdf_path) as pdf:
-                    for page in pdf.pages:
-                        text += page.extract_text() or ""  # Use empty string if text extraction fails
-            except Exception as e:
-                st.error(f"Error reading PDF: {e}")
-            return text
-
         with col_11:
             if choose == "Pre Uploaded":
                 subjects_folder = "./preuploaded"
