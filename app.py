@@ -319,7 +319,7 @@ if st.session_state.teach == 'Teachers':
     if st.session_state.quesai:
         st.session_state.selected_option = st.radio(
             "Select Options",
-            ("Topic Based Questions", "Text Analyzer","Pre Uploaded" , "Terminologies and Keyterms", "Learning Outcomes"),
+            ("Topic Based Questions", "Text Analyzer","Pre Uploaded" , "Terminologies and Keyterms", "Learning Outcomes","Question Paper Generator"),
             horizontal=True,
             index=0,
             key='option'
