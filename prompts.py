@@ -95,7 +95,10 @@ ai_prompt="""Based on the context, generate only questions considering following
              1. number of questions  - {}
              2. mode of questions - {}
              3. type of questions - {} 
-             Generate questions in both English and Hindi,first generate in English then in Hindi. The generated questions must be numbered seperately for English and Hindi.
+             4. language - {} (Generate questions in the specified language(s).)
+             Generate question,
+             If "English" is selected, generate questions only in English.
+             If "Hindi" is selected, generate questions only in Hindi.
              If you are generating Answers also, answer start from a new line.
              Generate all types of question and answer,and please insure the question and answer based on topic or text.
              Remember to keep all the information as it is. Response - {}
@@ -107,10 +110,14 @@ ai_topic_prompt="""Based on the context, generate only questions considering fol
                     3. mode of questions - {}
                     4. type of questions - {}
                     5. Level of questions - {}
-                    Response is to be generated in both english and Hindi,first generate in english then in Hindi,The generated questions must be numbered seperately for English and Hindi.
-                    and if you are generating Answers also, Answer it in a new line and Generate questions according to Madhya Pradesh School Education Board,
-                    generate the all types of question and answer,and please insure the question and answer based on topic or text.
-                """
+                    6. language - {}
+                    Generate question,
+                    If "English" is selected, generate questions only in English.
+                    If "Hindi" is selected, generate questions only in Hindi.
+                    If you are generating Answers also, answer start from a new line.
+                    Generate all types of question and answer,and please insure the question and answer based on topic or text.
+                    Remember to keep all the information as it is.
+                     """
 
 
 ai_topic_prompt1 = """
@@ -200,7 +207,14 @@ ai_topic_prompt_questions= """ Based on the context, extract only questions
 
 mcq_test_prompt =          """ Based on the context generate terminologies and key terms
                                first generate terminologies then generate key terms
-                               generate the response in both english and Hindi,first generate in english then in Hindi
+                               language - {}
+                               generate the response,
+                               If "English" is selected, generate questions only in English.
+                               If "Hindi" is selected, generate questions only in Hindi.
+                               please if selected hindi then generate response proper way 
+                               first generate terminologies then generate key terms
+                               make sure only generate the terminologies and key terms only.
+
                                Remember to keep all the information as it is. Response-{}    
                            """
 
@@ -211,7 +225,12 @@ key_term_prompt = """
 
 learn_outcome_prompt = """
                         Based on the context generate learning outcomes
-                        generate the response in both english and Hindi, first generate in english then in Hindi
+                        language - {}
+                        generate the response,
+                        If "English" is selected, generate questions only in English.
+                        If "Hindi" is selected, generate questions only in Hindi.
+                        please if selected hindi then generate response,
+                        make sure only generate the learning outcomes only.
                         Remember to keep all the information as it is. Response-{} 
                             
                     """
@@ -265,39 +284,41 @@ master_prompt = """
                 Remember to not discuss about the context you have recieved and do not mention you are unable to access or read any documents 
 
                 """
-ai_topic_prompt2= """
-                    Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
-                    
-                    Terminal: {}
-                    language: {}
-                    Maximum Marks: 80 (shown in the top right corner)
-                    Question Paper Format:
+ai_topic_prompt2 = """
+                            Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
 
-                    Objective Section
+                            Terminal: {}
+                            Language: {}
 
-                    Multiple Choice Questions (MCQs): 5 questions, each carrying 1 mark
+                            Please note the following instructions:
+                            - If the selected language is "English", generate all questions and instructions in **English only**.
+                            - If the selected language is "Hindi", generate all questions and instructions in **Hindi only**.
 
-                    Each question should have 4 options (a, b, c, d) and test basic knowledge and understanding of the subject.
+                            Maximum Marks: 80 (shown in the top right corner)
+                            Question Paper Format:
 
-                    Subjective Section
+                            Objective Section
 
-                    Fill in the Blanks: 5 questions, each carrying 1 mark
+                            Multiple Choice Questions (MCQs): 5 questions, each carrying 1 mark.
+                            Each question should have 4 options (a, b, c, d) and test basic knowledge and understanding of the subject.
 
-                    Assess specific knowledge related to the topic.
-                    True/False Statements: 5 questions, each carrying 1 mark
+                            Subjective Section
 
-                    Test students’ ability to identify the correctness of the statements.
-                    One-word Answers: 5 questions, each carrying 1 mark
+                            Fill in the Blanks: 5 questions, each carrying 1 mark.
+                            Assess specific knowledge related to the topic.
 
-                    Test precise knowledge and terminology.
-                    Short Answer Questions: 5 questions, each carrying 5 marks
+                            True/False Statements: 5 questions, each carrying 1 mark.
+                            Test students’ ability to identify the correctness of the statements.
 
-                    Require brief but detailed responses.
-                    Long Answer Questions: 5 questions, each carrying 10 marks
+                            One-word Answers: 5 questions, each carrying 1 mark.
+                            Test precise knowledge and terminology.
 
-                    Require detailed explanations and in-depth understanding.                
-                
-                  """
+                            Short Answer Questions: 5 questions, each carrying 5 marks.
+                            Require brief but detailed responses.
+
+                            Long Answer Questions: 5 questions, each carrying 10 marks.
+                            Require detailed explanations and in-depth understanding.
+                            """
 
 
 lang_prompt = """ Translate the below response to {} language . 
