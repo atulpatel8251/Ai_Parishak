@@ -746,7 +746,7 @@ if st.session_state.teach == 'Teachers':
 
                                         
 if st.session_state.teach=='Students':
-    choose=st.radio("Select Options",("Pre Uploaded","Ask a Query","Text Analyzer","Student Exam Attempt"),horizontal=True)
+    choose=st.radio("Select Options",("Pre Uploaded","Ask a Query","Text Analyzer"),horizontal=True)
     if choose == "Pre Uploaded":
         subjects_folder = "./preuploaded"
 
