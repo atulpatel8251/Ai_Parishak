@@ -1,4 +1,5 @@
 import json
+import pdfplumber
 from langchain_community.llms import OpenAI
 import chat
 import openai
@@ -38,6 +39,7 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain.llms import OpenAI
 from langchain_community.vectorstores import FAISS
 from docx import Document
+from langchain.vectorstores import Chroma
 from translate import Translator
 import os
 import time
@@ -45,6 +47,7 @@ from io import StringIO
 import shutil
 #from docxlatex import Document
 # from PIL import Image
+#client = OpenAI()
 
 st.set_page_config(layout='wide')
 
@@ -73,6 +76,7 @@ images = ['6MarkQ']
 #os.environ["OPENAI_API_TYPE"] = ""
 #os.environ["OPENAI_API_VERSION"] = ""openai_api_key = os.getenv("OPENAI_API_KEY")
 openai_api_key2 = st.secrets["secret_section"]["OPENAI_API_KEY"]
+
 #openai_api_key = os.getenv('OPENAI_API_KEY')
 TEMP_MD_FILE = r"question.pdf"
 TEMP_PDF_FILE = "__temp.pdf"
@@ -290,6 +294,51 @@ def pdf_to_text(file_path):
         for page in pdf_reader.pages:
             text += page.extract_text()
     return text
+
+# Helper function: Check if embeddings exist in the vector DB
+def check_embeddings_exist(vector_store, subject, chapter):
+    # Perform a simple similarity search
+    results = vector_store.similarity_search("dummy query", k=10)  # Adjust k based on your need
+
+    # Filter the results based on metadata (subject and chapter)
+    for result in results:
+        if result.metadata.get("subject") == subject and result.metadata.get("chapter") == chapter:
+            return True  # Embeddings for the given subject and chapter exist
+
+    return False 
+
+# Helper function: Create embeddings from text and store in Chroma only if not already stored
+def create_and_store_embeddings(text, subject, chapter, vector_store):
+    # Check if the embeddings already exist for the specific subject and chapter
+    if check_embeddings_exist(vector_store, subject, chapter):
+        st.info("file already exist.")
+        return  # Exit the function if the file already exists
+
+    # If the embeddings do not exist, create embeddings
+    else:
+        embedding_model = OpenAIEmbeddings(openai_api_key=openai_api_key2)
+
+        # Split the text into manageable chunks (Chroma works well with smaller chunks)
+        text_chunks = [text[i:i + 1000] for i in range(0, len(text), 1000)]  # Adjust chunk size as needed
+        
+        # Generate embeddings for the document chunks
+        embeddings = embedding_model.embed_documents(text_chunks)
+        
+        # Store the generated embeddings in the vector database with metadata
+        vector_store.add_texts(
+            texts=text_chunks,
+            embeddings=embeddings,
+            metadatas=[{"subject": subject, "chapter": chapter} for _ in text_chunks]
+        )
+        
+        st.info("Embeddings created and stored successfully!")
+
+# Initialize Chroma vector store
+def initialize_chroma():
+    # Chroma DB configuration (you can use any other vector DB like Pinecone, etc.)
+    chroma_vector_store = Chroma(persist_directory="./chroma_db", embedding_function=OpenAIEmbeddings(openai_api_key=openai_api_key2))
+    return chroma_vector_store
+
 def list_files(folder_path):
     return os.listdir(folder_path)
 
@@ -330,6 +379,9 @@ if st.session_state.teach == 'Teachers':
         with col_11:
             if choose == "Pre Uploaded":
                 subjects_folder = "./preuploaded"
+                
+                # Initialize Chroma DB
+                vector_store = initialize_chroma()
 
                 # List subjects
                 subjects_list = [d for d in os.listdir(subjects_folder) if os.path.isdir(os.path.join(subjects_folder, d))]
@@ -361,26 +413,45 @@ if st.session_state.teach == 'Teachers':
                         st.session_state.filename.append(selected_file)
                         st.session_state.text = pdf_to_text(pdf_file_path)
 
+                    # Once text is extracted, generate embeddings and store in Chroma only once
+                    if st.session_state.text:
+                        create_and_store_embeddings(st.session_state.text, selected_subject, selected_file, vector_store)
+
                     if st.session_state.text:
                         # Input settings
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.session_state.complexity = st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'], index=0, key="mode")
-                            st.session_state.no_of_questions = st.number_input('No. of Questions to generate*', key="ai_questions", step=1, max_value=30)
-                            st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Only Questions', 'Questions with Answers'], index=0, key="quesansw")
-                        with col2:
-                            st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Short Questions', 'Long Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0)
-                            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
+                        with st.form(key="Pre Uploaded"):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.session_state.complexity = st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'], index=0, key="mode")
+                                st.session_state.no_of_questions = st.number_input('No. of Questions to generate*', key="ai_questions", step=1, max_value=30)
+                                st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Only Questions', 'Questions with Answers'], index=0, key="quesansw")
+                            with col2:
+                                st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Short Questions', 'Long Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0)
+                                st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
+                            submitted = st.form_submit_button("Submit")
+                            # Button to trigger processing
 
-                        # Button to trigger processing
-                        if st.button("Submit"):
-                            if st.session_state.text and st.session_state.mode_of_questions != 'Select Option':
+                        if submitted and st.session_state.text and st.session_state.mode_of_questions != 'Select Option':
+                            # Query the vector store for relevant text chunks before generating questions
+                            results = vector_store.similarity_search(st.session_state.text, k=5)
+
+# Manually filter the results based on the subject and chapter
+                            filtered_results = []
+                            for result in results:
+                                if result.metadata.get("subject") == selected_subject and result.metadata.get("chapter") == selected_file:
+                                    filtered_results.append(result)
+
+                            # Use filtered_results for further processing
+                            if filtered_results:
+                                relevant_text = " ".join([res.page_content for res in filtered_results])
+
+                                # Pass relevant text to the LLM for question generation
                                 st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
                                 chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
                                 formatted_output = st.session_state.llm.predict(input=ai_topic_prompt1.format(
                                     chapter_info,
                                     st.session_state.no_of_questions,
-                                    st.session_state.text,
+                                    relevant_text,  # Use relevant text from vector store
                                     st.session_state.language,
                                     st.session_state.mode_of_questions,
                                     st.session_state.type_of_questions,
@@ -400,47 +471,47 @@ if st.session_state.teach == 'Teachers':
                                     mime="application/octet-stream",
                                     key='worddownload'
                                 )
-
+                            else:
+                                st.info("No relevant results found based on the subject and chapter metadata.")
             if choose == "Terminologies and Keyterms":
                 subjects_folder = "./preuploaded"
-                # List subjects
                 subjects_list = [d for d in os.listdir(subjects_folder) if os.path.isdir(os.path.join(subjects_folder, d))]
                 subjects_list.sort()
                 subjects_list.insert(0, "Select subject")
 
                 selected_subject = st.selectbox("Select a subject", subjects_list, index=0, key='subject_selector')
 
-                if selected_subject != "Select subject":     
-                    # List chapters for the selected subject
-                    folder_path = os.path.join(subjects_folder, selected_subject)                               
+                if selected_subject != "Select subject":
+                    folder_path = os.path.join(subjects_folder, selected_subject)
                     files_list = list_files(folder_path)
                     files_list = [remove_extension(filename) for filename in files_list]
                     files_list.insert(0, "Select document")
                     selected_file = st.selectbox("Select a file", files_list, index=0, key='terminologies_selected_file')
-                    st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
-                    def mcq_response(result: str, persist_directory: str = constants.PERSIST_DIR) -> str:
-                        formatted_response = st.session_state.mcq_chain.predict(input=mcq_test_prompt.format(result,st.session_state.language))
-                        st.write(formatted_response)
-                        return formatted_response
+                    st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
 
                     if selected_file != "Select document":
-                        st.session_state.filename = []
-                        with open(os.path.join(folder_path, selected_file + '.pdf'), 'rb') as file:
-                            reader = PdfReader(file)
-                            text = StringIO()
-                            for page in reader.pages:
-                                text.write(page.extract_text())
-                            text = text.getvalue()
-                        st.session_state.filename.append(selected_file)
-                        st.session_state.mcq_chain = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7,api_key=openai_api_key2))
-                        outputs = mcq_response(text)
-                        markdown_to_pdf(outputs, 'question.pdf')
-                        word_doc = create_word_doc(outputs)
+                        pdf_file_path = os.path.join(folder_path, selected_file + '.pdf')
+                        text = pdf_to_text(pdf_file_path)
+
+                        # Check and create embeddings only if they do not already exist
+                        vector_store = initialize_chroma()
+                        if not check_embeddings_exist(vector_store, selected_subject, selected_file):
+                            create_and_store_embeddings(text, selected_subject, selected_file, vector_store)
+
+                        # Proceed with generating responses
+                        st.session_state.mcq_chain = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
+                        formatted_response = st.session_state.mcq_chain.predict(input=mcq_test_prompt.format(text, st.session_state.language))
+                        st.write(formatted_response)
+
+                        # Generate and download document
+                        markdown_to_pdf(formatted_response, 'question.pdf')
+                        word_doc = create_word_doc(formatted_response)
                         doc_buffer = download_doc(word_doc)
                         st.download_button(label="Download Word Document", data=doc_buffer, file_name="generated_document.docx", mime="application/octet-stream", key='worddownload3')
 
             if choose == "Learning Outcomes":
                 subjects_folder = "./preuploaded"
+                
                 # List subjects
                 subjects_list = [d for d in os.listdir(subjects_folder) if os.path.isdir(os.path.join(subjects_folder, d))]
                 subjects_list.sort()
@@ -450,32 +521,60 @@ if st.session_state.teach == 'Teachers':
 
                 if selected_subject != "Select subject":
                     # List chapters for the selected subject
-                    folder_path = os.path.join(subjects_folder, selected_subject)                
+                    folder_path = os.path.join(subjects_folder, selected_subject)
                     files_list = list_files(folder_path)
                     files_list = [remove_extension(filename) for filename in files_list]
                     files_list.insert(0, "Select document")
+                    
                     selected_file = st.selectbox("Select a file", files_list, index=0, key='learning_outcomes_selected_file')
-                    st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
-                    def learn_outcome_term(result: str, persist_directory: str = constants.PERSIST_DIR) -> str:
-                        formatted_response = st.session_state.learn_outcome_chain.predict(input=learn_outcome_prompt.format(result,st.session_state.language))
-                        st.write(formatted_response)
-                        return formatted_response
+                    st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
 
                     if selected_file != "Select document":
+                        # Initialize Chroma DB
+                        vector_store = initialize_chroma()
+
                         st.session_state.filename = []
-                        with open(os.path.join(folder_path, selected_file + '.pdf'), 'rb') as file:
+                        pdf_file_path = os.path.join(folder_path, selected_file + '.pdf')
+                        
+                        with open(pdf_file_path, 'rb') as file:
                             reader = PdfReader(file)
                             text = StringIO()
                             for page in reader.pages:
                                 text.write(page.extract_text())
                             text = text.getvalue()
+                        
                         st.session_state.filename.append(selected_file)
-                        st.session_state.learn_outcome_chain = ConversationChain(llm=ChatOpenAI(model="gpt-4o-mini", temperature=0.7,api_key=openai_api_key2))
+
+                        # Check if embeddings already exist
+                        if not check_embeddings_exist(vector_store, selected_subject, selected_file):
+                            # Create and store embeddings if they don't exist
+                            create_and_store_embeddings(text, selected_subject, selected_file, vector_store)
+
+                        # Define helper function for learning outcomes
+                        def learn_outcome_term(result: str, persist_directory: str = constants.PERSIST_DIR) -> str:
+                            formatted_response = st.session_state.learn_outcome_chain.predict(input=learn_outcome_prompt.format(result, st.session_state.language))
+                            st.write(formatted_response)
+                            return formatted_response
+
+                        # Proceed to generate learning outcomes
+                        st.session_state.learn_outcome_chain = ConversationChain(
+                            llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2)
+                        )
                         outputs = learn_outcome_term(text)
-                        markdown_to_pdf(outputs, 'question.pdf')
+                        
+                        # Generate PDF and Word downloads
+                        markdown_to_pdf(outputs, 'learning_outcomes.pdf')
                         word_doc = create_word_doc(outputs)
                         doc_buffer = download_doc(word_doc)
-                        st.download_button(label="Download Word Document", data=doc_buffer, file_name="generated_document.docx", mime="application/octet-stream", key='worddownload3')
+
+                        # Download button for the generated Word document
+                        st.download_button(
+                            label="Download Word Document",
+                            data=doc_buffer,
+                            file_name="learning_outcomes.docx",
+                            mime="application/octet-stream",
+                            key='worddownload3'
+                        )
 
             if choose=="Text Analyzer":
                 txt = st.text_area(
@@ -489,17 +588,17 @@ if st.session_state.teach == 'Teachers':
                     lowercase_dict = {key.lower(): value for key, value in existing_dictionary.items()}
                     st.session_state.text=correct_bhashni_translations(txt,lowercase_dict)
                     #st.write(st.session_state.text)
-
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        #st.session_state.complexity =  st.selectbox('Complexity Mode Required?*', ['No', 'Yes'],index=0,key="mode")
-                        st.session_state.no_of_questions = st.number_input('No. of  Questions to generate*',key="ai_questions_no_k",step=1,max_value=30)
-                        st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Select Option','Only Questions', 'Questions with Answers'],index=0,key="quesansw")
-                    with col2:
-                        st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
-                        st.session_state.type_of_questions =  st.selectbox('Choose Question Type*', ['Select Option','Short Questions','MCQ','Fill in the Blanks','True and False'],index=0,key="ai_questions_no_s")
-                    if st.button("Submit"):
-                       if st.session_state.text and st.session_state.no_of_questions>0:
+                    with st.form(key="Text Analyzer"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            #st.session_state.complexity =  st.selectbox('Complexity Mode Required?*', ['No', 'Yes'],index=0,key="mode")
+                            st.session_state.no_of_questions = st.number_input('No. of  Questions to generate*',key="ai_questions_no_k",step=1,max_value=30)
+                            st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Select Option','Only Questions', 'Questions with Answers'],index=0,key="quesansw")
+                        with col2:
+                            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
+                            st.session_state.type_of_questions =  st.selectbox('Choose Question Type*', ['Select Option','Short Questions','MCQ','Fill in the Blanks','True and False'],index=0,key="ai_questions_no_s")
+                        submitted = st.form_submit_button("Submit")
+                    if submitted and st.session_state.text and st.session_state.no_of_questions>0:
                             st.session_state.llm = ConversationChain( llm=ChatOpenAI(
                             model="gpt-4o",
                             temperature=0.7,
@@ -607,49 +706,54 @@ if st.session_state.teach == 'Teachers':
                     st.info("Please upload an image file.")
    
                 
-            if choose=="Topic Based Questions":
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.session_state.topic_name = st.text_input('Specific Topic Name',placeholder="Topic Name",key="tt")
-                    st.session_state.complexity =  st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'],index=0,key="mode1")
-                    st.session_state.no_of_questions = st.number_input('No. of  Questions to generate*',key="ai_questions_no_a",step=1,max_value=30)
-                with col2:
-                    st.session_state.type_of_questions =  st.selectbox('Choose Question Type*', ['Select Option','Short Questions','MCQ','Fill in the Blanks','True and False'],index=0,key="ai_questions_no_p")
-                    st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
-                    st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Select Option','Only Questions', 'Questions with Answers'],index=0,key="quesanswz")
-                if st.button("Submit"):
-                   if st.session_state.topic_name and st.session_state.mode_of_questions!='Select Option' :
-                      st.session_state.llm = ConversationChain( llm=ChatOpenAI(
-                                                              model = "gpt-4o-mini",
-                                                              temperature=0.7,
-                                                              api_key=openai_api_key2
-                                                              ))
+            if choose == "Topic Based Questions":
+                with st.form(key="Topic Based Questions"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.session_state.topic_name = st.text_input('Specific Topic Name', placeholder="Topic Name", key="tt")
+                        st.session_state.complexity = st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'], index=0, key="mode1")
+                        st.session_state.no_of_questions = st.number_input('No. of Questions to generate*', key="ai_questions_no_a", step=1, max_value=30)
+                    with col2:
+                        st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Select Option', 'Short Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0, key="ai_questions_no_p")
+                        st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
+                        st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Select Option', 'Only Questions', 'Questions with Answers'], index=0, key="quesanswz")
 
-                      formatted_output = st.session_state.llm.predict(input = ai_topic_prompt.format(st.session_state.topic_name,
-                                                                                                st.session_state.no_of_questions,
-                                                                                                    st.session_state.mode_of_questions,
-                                                                                                    st.session_state.type_of_questions,
-                                                                                                    st.session_state.language,
-                                                                                                  st.session_state.complexity))
-                    
-                    
-                      st.write(formatted_output)                                                 
-                      markdown_to_pdf(formatted_output,'question.pdf')
-                    
-                    
-                      word_doc = create_word_doc(formatted_output)
-                      doc_buffer = download_doc(word_doc)
-                      st.download_button(label="Download Word Document", 
-                      data=doc_buffer, 
-                      file_name="generated_document.docx", 
-                      mime="application/octet-stream",
-                      key='worddownload3')
+                    submitted = st.form_submit_button("Submit")
+
+                if submitted and st.session_state.topic_name and st.session_state.mode_of_questions != 'Select Option':
+                    st.session_state.llm = ConversationChain(llm=ChatOpenAI(
+                        model="gpt-4o-mini",
+                        temperature=0.7,
+                        api_key=openai_api_key2
+                    ))
+
+                    formatted_output = st.session_state.llm.predict(input=ai_topic_prompt.format(
+                        st.session_state.topic_name,
+                        st.session_state.no_of_questions,
+                        st.session_state.mode_of_questions,
+                        st.session_state.type_of_questions,
+                        st.session_state.language,
+                        st.session_state.complexity
+                    ))
+
+                    st.write(formatted_output)
+
+                    # Generate PDF and Word files
+                    markdown_to_pdf(formatted_output, 'question.pdf')
+                    word_doc = create_word_doc(formatted_output)
+                    doc_buffer = download_doc(word_doc)
+
+                    # Move the download button outside the form
+                    st.download_button(label="Download Word Document",
+                                    data=doc_buffer,
+                                    file_name="generated_document.docx",
+                                    mime="application/octet-stream",
+                                    key='worddownload3')
             
 
             if choose == "Question Paper Generator":
                 subjects_folder = "./preuploaded"
-
+                
                 # List subjects
                 subjects_list = [d for d in os.listdir(subjects_folder) if os.path.isdir(os.path.join(subjects_folder, d))]
                 subjects_list.sort()
@@ -658,95 +762,101 @@ if st.session_state.teach == 'Teachers':
                 selected_subject = st.selectbox("Select a subject", subjects_list, index=0, key='subject_selector')
 
                 if selected_subject != "Select subject":
-                    # List chapters for the selected subject
+                    # List chapters/documents for the selected subject
                     folder_path = os.path.join(subjects_folder, selected_subject)
                     files_list = list_files(folder_path)
                     files_list = [remove_extension(filename) for filename in files_list]
-                    files_list.sort()
-                    files_list.insert(0, "All Chapters")
+                    files_list.insert(0, "Select document")
+                    
+                    selected_file = st.selectbox("Select a file", files_list, index=0, key='chapter_selector')
 
-                    selected_file = st.selectbox("Select a chapter (optional)", files_list, index=0, key='chapter_selector')
+                    # Language and exam terminal selection
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.session_state.Terminal = st.selectbox('Exam Terminal*', ['1st Term', '2nd Term', 'Pre Board', 'Unit Test'], index=0, key="mode")
+                    with col2:
+                        st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
 
-                    # Initialize text variable
-                    st.session_state.text = ""
+                    if selected_file != "Select document":
+                        # Initialize Chroma DB
+                        vector_store = initialize_chroma()
 
-                    if selected_file == "All Chapters":
-                        for file in files_list[1:]:  # Skip "All Chapters" option
-                            pdf_file_path = os.path.join(folder_path, file + '.pdf')
-                            st.session_state.text += pdf_to_text(pdf_file_path) + "\n"
-                    elif selected_file != "Select chapter":
+                        # Initialize filename for the selected document
                         st.session_state.filename = []
                         pdf_file_path = os.path.join(folder_path, selected_file + '.pdf')
+
+                        # Extract text from the selected PDF file
+                        with open(pdf_file_path, 'rb') as file:
+                            reader = PdfReader(file)
+                            text = StringIO()
+                            for page in reader.pages:
+                                text.write(page.extract_text())
+                            text = text.getvalue()
+
                         st.session_state.filename.append(selected_file)
-                        st.session_state.text = pdf_to_text(pdf_file_path)
 
-                    if st.session_state.text:
-    # Input settings
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.session_state.Terminal = st.selectbox('Exam Terminal*', ['1st Term', '2nd Term', 'Pre Board', 'Unit Test'], index=0, key="mode")
-                        with col2:
-                            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
+                        # Check if embeddings already exist for the document
+                        if not check_embeddings_exist(vector_store, selected_subject, selected_file):
+                            # If embeddings don't exist, create and store them
+                            create_and_store_embeddings(text, selected_subject, selected_file, vector_store)
 
-                        # Button to trigger processing
+                        # Helper function to generate the question paper
+                        def generate_question_paper(text_content: str) -> str:
+                            # Pass the text and language selection to the LLM to generate the question paper
+                            formatted_response = st.session_state.llm.predict(
+                                input=ai_topic_prompt2.format(f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters", st.session_state.language)
+                            )
+                            st.info(formatted_response)
+                            return formatted_response
+
+                        # Initialize LLM for generating the question paper
+                        st.session_state.llm = ConversationChain(
+                            llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2)
+                        )
+
+                        # Button to trigger question paper generation
                         if st.button("Submit"):
-                            if st.session_state.text and st.session_state.Terminal != 'Select Option':
-                                st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
+                            # Proceed to generate the question paper if the text and terminal are selected
+                            if text and st.session_state.Terminal != 'Select Option':
+                                generated_output = generate_question_paper(text)
 
-                                # Ensure correct language is passed to the model
-                                chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
+                                # Save the generated output as a PDF
+                                markdown_to_pdf(generated_output, 'question_paper.pdf')
 
-                                # Generate the formatted output based on language selection
-                                if st.session_state.language == "English":
-                                    formatted_output = st.session_state.llm.predict(input=ai_topic_prompt2.format(
-                                        chapter_info,
-                                        "English"
-                                    ))
-                                elif st.session_state.language == "Hindi":
-                                    formatted_output = st.session_state.llm.predict(input=ai_topic_prompt2.format(
-                                        chapter_info,
-                                        "Hindi"
-                                    ))
+                                # Save the generated output as a Word document
+                                word_doc = create_word_doc(generated_output)
+                                doc_buffer = download_doc(word_doc)
 
-                                # Display the generated question paper
-                                st.info(formatted_output)
-                                
-                                # Define paths for saving the documents
+                                # Provide a download button for the Word document
+                                st.download_button(
+                                    label="Download Word Document",
+                                    data=doc_buffer,
+                                    file_name="question_paper.docx",
+                                    mime="application/octet-stream",
+                                    key='worddownload'
+                                )
+
+                                # Save the document to appropriate terminal folder
                                 base_folder = './exam_uploaded'
                                 terminal_folder = os.path.join(base_folder, st.session_state.Terminal)
 
-                                # Create directories if they don't exist
                                 if not os.path.exists(base_folder):
                                     os.makedirs(base_folder)
                                 if not os.path.exists(terminal_folder):
                                     os.makedirs(terminal_folder)
 
-                                # Save the question paper as PDF
-                                pdf_file_path = os.path.join(terminal_folder, 'question.pdf')
-                                markdown_to_pdf(formatted_output, pdf_file_path)
-
-                                # Save the question paper as Word document
-                                word_doc = create_word_doc(formatted_output)
+                                # Save PDF and Word files
+                                pdf_file_path = os.path.join(terminal_folder, 'question_paper.pdf')
                                 word_file_path = os.path.join(terminal_folder, 'generated_document.docx')
                                 word_doc.save(word_file_path)
 
-                                # Provide download button for Word document
-                                doc_buffer = download_doc(word_doc)
-                                st.download_button(
-                                    label="Download Word Document",
-                                    data=doc_buffer,
-                                    file_name="generated_document.docx",
-                                    mime="application/octet-stream",
-                                    key='worddownload'
-                                )
-
-                                # Provide feedback about file saving
+                                # Upload success feedback
                                 if st.button("Upload Question Paper"):
-                                    st.success(f"{st.session_state.Terminal} Question paper uploaded successfully ")
+                                    st.success(f"{st.session_state.Terminal} Question paper uploaded successfully")
 
                                         
 if st.session_state.teach=='Students':
-    choose=st.radio("Select Options",("Pre Uploaded","Ask a Query","Text Analyzer"),horizontal=True)
+    choose=st.radio("Select Options",("Pre Uploaded","Ask a Query","Text Analyzer","Student Exam Attempt"),horizontal=True)
     if choose == "Pre Uploaded":
         subjects_folder = "./preuploaded"
 
@@ -782,44 +892,44 @@ if st.session_state.teach=='Students':
 
             if st.session_state.text:
                 # Input settings
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.session_state.complexity = st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'], index=0, key="mode")
-                    st.session_state.no_of_questions = st.number_input('No. of Questions to generate*', key="ai_questions", step=1, max_value=30)
-                    st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Only Questions', 'Questions with Answers'], index=0, key="quesansw")
-                with col2:
-                    st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Short Questions', 'Long Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0)
-                    st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
+                with st.form(key="Pre Uploaded"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.session_state.complexity = st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'], index=0, key="mode")
+                        st.session_state.no_of_questions = st.number_input('No. of Questions to generate*', key="ai_questions", step=1, max_value=30)
+                        st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Only Questions', 'Questions with Answers'], index=0, key="quesansw")
+                    with col2:
+                        st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Short Questions', 'Long Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0)
+                        st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
+                    submitted = st.form_submit_button("Submit")
+                    # Button to trigger processing
+                    
+                if submitted and st.session_state.text and st.session_state.mode_of_questions != 'Select Option':
+                    st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
+                    chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
+                    formatted_output = st.session_state.llm.predict(input=ai_topic_prompt1.format(
+                        chapter_info,
+                        st.session_state.no_of_questions,
+                        st.session_state.text,
+                        st.session_state.language,
+                        st.session_state.mode_of_questions,
+                        st.session_state.type_of_questions,
+                        st.session_state.complexity,
+                        st.session_state.no_of_questions
+                    ))
 
-                # Button to trigger processing
-                if st.button("Submit"):
-                    if st.session_state.text and st.session_state.mode_of_questions != 'Select Option':
-                        st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
-                        chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
-                        formatted_output = st.session_state.llm.predict(input=ai_topic_prompt1.format(
-                            chapter_info,
-                            st.session_state.no_of_questions,
-                            st.session_state.text,
-                            st.session_state.language,
-                            st.session_state.mode_of_questions,
-                            st.session_state.type_of_questions,
-                            st.session_state.complexity,
-                            st.session_state.no_of_questions
-                        ))
+                    st.info(formatted_output)
+                    markdown_to_pdf(formatted_output, 'question.pdf')
+                    word_doc = create_word_doc(formatted_output)
+                    doc_buffer = download_doc(word_doc)
 
-                        st.info(formatted_output)
-                        markdown_to_pdf(formatted_output, 'question.pdf')
-                        word_doc = create_word_doc(formatted_output)
-                        doc_buffer = download_doc(word_doc)
-
-                        st.download_button(
-                            label="Download Word Document",
-                            data=doc_buffer,
-                            file_name="generated_document.docx",
-                            mime="application/octet-stream",
-                            key='worddownload'
-    
-                        )   
+                    st.download_button(
+                        label="Download Word Document",
+                        data=doc_buffer,
+                        file_name="generated_document.docx",
+                        mime="application/octet-stream",
+                        key='worddownload'
+                    ) 
     
     if choose=="Text Analyzer":
                 
@@ -835,18 +945,19 @@ if st.session_state.teach=='Students':
                     st.session_state.text=correct_bhashni_translations(txt,lowercase_dict)
                     #st.write(st.session_state.text)
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        #st.session_state.complexity =  st.selectbox('Complexity Mode Required?*', ['No', 'Yes'],index=0,key="mode")
-                        st.session_state.no_of_questions = st.number_input('No. of  Questions to generate*',key="ai_questions_no_ks",step=1,max_value=30)
-                        st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Select Option','Only Questions', 'Questions with Answers'],index=0,key="quesansws")
-                    with col2:
-                        st.session_state.language = st.selectbox('Choose Response Language Mode*', ['English', 'Hindi'], index=0, key="lang")
-                        st.session_state.type_of_questions =  st.selectbox('Choose Question Type*', ['Select Option','Short Questions','MCQ','Fill in the Blanks','True and False'],index=0,key="ai_questions_no_ss")
-                    if st.button("Submit"):
-                        if st.session_state.text and st.session_state.mode_of_questions!='Select Option' :
+                    with st.form(key="Text Analyzer"):
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            #st.session_state.complexity =  st.selectbox('Complexity Mode Required?*', ['No', 'Yes'],index=0,key="mode")
+                            st.session_state.no_of_questions = st.number_input('No. of  Questions to generate*',key="ai_questions_no_k",step=1,max_value=30)
+                            st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Select Option','Only Questions', 'Questions with Answers'],index=0,key="quesansw")
+                        with col2:
+                            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
+                            st.session_state.type_of_questions =  st.selectbox('Choose Question Type*', ['Select Option','Short Questions','MCQ','Fill in the Blanks','True and False'],index=0,key="ai_questions_no_s")
+                        submitted = st.form_submit_button("Submit")
+                    if submitted and st.session_state.text and st.session_state.no_of_questions>0:
                             st.session_state.llm = ConversationChain( llm=ChatOpenAI(
-                            model_name="gpt-4o-mini",
+                            model="gpt-4o",
                             temperature=0.7,
                             api_key=openai_api_key2
                             )) 
@@ -857,13 +968,14 @@ if st.session_state.teach=='Students':
                                                                             st.session_state.text))
                             st.info(formatted_output)
                             markdown_to_pdf(formatted_output,'question.pdf')
-                            
                             word_doc = create_word_doc(formatted_output)
                             doc_buffer = download_doc(word_doc)
-                            st.download_button(label="Download Word Document", 
+                            st.session_state.doc_buffer = doc_buffer
+                            if 'doc_buffer' in st.session_state:
+                                st.download_button(label="Download Word Document", 
                                             data=doc_buffer, 
                                             file_name="generated_document.docx", 
-                                            mime="application/octet-stream",on_click=None,
+                                            mime="application/octet-stream",
                                             key='worddownload2')
 
     else:
