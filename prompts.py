@@ -91,132 +91,159 @@ latex_prompt="""format the response {} into python list.
 #             Remember to keep all the information as it is. Response - {}
 #"""
 
-ai_prompt="""Based on the context, generate only questions considering following constraints,
-             1. number of questions  - {}
-             2. mode of questions - {}
-             3. type of questions - {} 
-             4. language - {} (Generate questions in the specified language(s).)
-             Generate question,
-             If "English" is selected, generate questions only in English.
-             If "Hindi" is selected, generate questions only in Hindi.
-             If you are generating Answers also, answer start from a new line.
-             Generate all types of question and answer,and please insure the question and answer based on topic or text.
-             Remember to keep all the information as it is. Response - {}
-"""
+ai_prompt = """
+            Based on the context, generate only questions considering the following constraints:
+            1. Number of questions - {}
+            2. Mode of questions - {}
+            3. Type of questions - {} 
+            4. Language - {} (Generate questions in the specified language(s).)
 
-ai_topic_prompt="""Based on the context, generate only questions considering following constraints,
-                    1. topic of questions  - {}
-                    2. number of questions - {} 
-                    3. mode of questions - {}
-                    4. type of questions - {}
+            Generate questions:
+            - If "English" is selected, generate questions only in English.
+            - If "Hindi" is selected, generate questions only in Hindi.
+            - If "English and Hindi" is selected, generate both English and Hindi versions of the questions.
+
+            If you are generating answers as well, ensure that answers start on a new line.
+            Generate all types of questions and answers, and ensure that the questions and answers are based on the topic or text.
+            Remember to keep all the information as it is.
+
+            Response - {}
+            """
+
+
+ai_topic_prompt = """
+                    Based on the context, generate only questions considering the following constraints:
+                    1. Topic of questions - {}
+                    2. Number of questions - {} 
+                    3. Mode of questions - {}
+                    4. Type of questions - {}
                     5. Level of questions - {}
-                    6. language - {}
-                    Generate question,
-                    If "English" is selected, generate questions only in English.
-                    If "Hindi" is selected, generate questions only in Hindi.
-                    If you are generating Answers also, answer start from a new line.
-                    Generate all types of question and answer,and please insure the question and answer based on topic or text.
-                    Remember to keep all the information as it is.
-                     """
+                    6. Language - {}
+
+                    Generate questions:
+                    - If "English" is selected, generate questions only in English.
+                    - If "Hindi" is selected, generate questions only in Hindi.
+                    - If "English and Hindi" is selected, generate both English and Hindi versions of the questions.
+
+                    If you are generating answers as well, ensure that answers start on a new line. 
+                    Generate all types of questions and answers, ensuring that they are based on the topic or text. 
+                    Please remember to keep all the information as it is.
+                """
+
 
 
 ai_topic_prompt1 = """
-                        You are provided with a document containing text related to a specific topic. Responses should be generated in both English and Hindi, with English content appearing first, followed by Hindi. Ensure that all questions and answers, if required, are derived solely from the provided text. Follow these guidelines strictly:
+                    You are provided with a document containing text related to a specific topic. Generate questions and answers based solely on the provided text, following these constraints:
 
-                        1. **Number of Questions**: {} (Generate exactly this number of questions in the specified language(s). If multiple chapters are involved, distribute the questions among the chapters as equally as possible.)
-                        2. **Text**: {}   
-                        3. **Language**: {} (Generate questions in the specified language(s).)
-                        4. **Mode of Questions**: {} (Questions only / Questions with Answers)
-                        5. **Type of Questions**: {} (Short Questions / Long Questions / MCQ / Fill in the Blanks / True and False)
-                        6. **Complexity Level**: {} (Easy / Difficult)
-                        7. **Chapter Information**: Include the chapter name or indication with each question in parentheses.
+                    1. **Number of Questions**: {} (Generate exactly this number of questions. Neither more nor less.)
+                    2. **Text**: {}   
+                    3. **Language**: {} 
+                        - If "English" is selected, generate only English questions and answers.
+                        - If "Hindi" is selected, generate only Hindi questions and answers.
+                        - If "English and Hindi" is selected, generate each question first in English, followed by the Hindi translation of the same question.
+                    4. **Mode of Questions**: {} (Questions only / Questions with Answers)
+                    5. **Type of Questions**: {} (Short Questions / Long Questions / MCQ / Fill in the Blanks / True and False)
+                    6. **Complexity Level**: {} (Easy / Difficult)
+                    7. **Chapter Information**: {} (If "All Chapters" is selected, distribute the questions equally across all chapters. If a specific chapter is selected, generate questions only from that chapter.)
 
-                        ### Instructions:
-                        - **Strictly use the content from the provided text** to formulate the questions and answers.
-                        - **Do not use any external sources**.
-                        - **Do not translate key terms and concepts**; instead, use the exact words and phrases as found in the document.
-                        - Ensure that specific terms in English are matched with their exact counterparts in Hindi as found in the document. For example:
-                        - "Potential difference" should be "विभवांतर"
-                        - "Electric current" should be "विद्युत धारा"
-                        - Generate **exactly** the specified number of questions in the chosen language(s).
-                        - **If the mode of questions is "Questions only"**:
-                        - Generate only the questions without answers.
-                        - **If the mode of questions is "Questions with Answers"**:
-                        - Provide the answers immediately following each question, on the next line.
-                        - If questions are to be generated from multiple chapters:
-                        - **Distribute the total number of questions equally among the chapters**.
-                        - **If the number of questions cannot be equally divided, ensure that the distribution is as fair as possible**, with some chapters receiving one more question than others if necessary.
-                        - Format the response in the chosen language(s):
-                        - If "English" is selected, generate questions only in English.
-                        - If "Hindi" is selected, generate questions only in Hindi.
-                        - Include the chapter name or indication with each question in parentheses.
-                        - Ensure clarity and readability in both questions and answers.
-                        - For multiple-choice questions, provide 4 options on separate lines, and place the correct answer on the next line after the options.
+                    ### Instructions:
+                    - **Use only the content from the provided text** to generate the questions and answers.
+                    - **Do not use any external sources**.
 
-                        ### Example Format:
-                        **Question 1:** [Your question here] (Chapter: [Extracted Chapter Name])
+                    - **If "Questions only" is selected**, generate only questions without answers.
+                    - **If "Questions with Answers" is selected**, provide answers immediately following each question.
 
-                        **a.** [Option 1]
+                    - **Language Instructions**:
+                        - If "English" is selected, generate questions and answers only in English.
+                        - If "Hindi" is selected, generate questions and answers only in Hindi.
+                        - If "English and Hindi" is selected, generate each question first in English, followed by its Hindi version.
 
-                        **b.** [Option 2]
+                    - **MCQ Format**:
+                        For multiple-choice questions, provide 4 options on separate lines, followed by the correct answer on the next line.
+                    
+                    ### Example Formats:
 
-                        **c.** [Option 3]
+                    **For MCQs**:
 
-                        **d.** [Option 4]
+                    **Question 1 (English):** [Your question here] (Chapter: [Chapter Name])
+                    
+                    **a.** [Option 1]  
+                    **b.** [Option 2]  
+                    **c.** [Option 3]  
+                    **d.** [Option 4]
 
-                        **Answer:** [Correct answer here] (Only if "Questions with Answers" is selected)
+                    **Answer:** [Correct answer here] (Only if "Questions with Answers" is selected)
 
-                        **Question 2:** [Your question here] (Chapter: [Extracted Chapter Name])
+                    **Question 1 (Hindi):** [Your question in Hindi] (Chapter: [Chapter Name])
 
-                        **a.** [Option 1]
+                    **क.** [Option 1]  
+                    **ख.** [Option 2]  
+                    **ग.** [Option 3]  
+                    **घ.** [Option 4]
 
-                        **b.** [Option 2]
+                    **उत्तर:** [Correct answer in Hindi] (Only if "Questions with Answers" is selected)
 
-                        **c.** [Option 3]
+                    **For Fill in the Blanks**:
 
-                        **d.** [Option 4]
+                    **Question 1 (English):** The ______ is black. (Chapter: [Chapter Name])
 
-                        **Answer:** [Correct answer here] (Only if "Questions with Answers" is selected)
+                    **Answer:** The cat is black. (Only if "Questions with Answers" is selected)
 
-                        **Fill in the Blanks Example:**
+                    **Question 1 (Hindi):** ______ काली है। (Chapter: [Chapter Name])
 
-                        **Question 1 (English):** The ______ is black. (Chapter: [Extracted Chapter Name])
+                    **Answer:** बिल्ली काली है। (Only if "Questions with Answers" is selected)
 
-                        **Answer (English):** The cat is black. (Only if "Questions with Answers" is selected)
+                    **For True/False**:
 
-                        **Question 1 (Hindi):** ______ काली है। (Chapter: [Extracted Chapter Name])
+                    **Question 1 (English):** [Your statement here] (Chapter: [Chapter Name])
 
-                        **Answer (Hindi):** बिल्ली काली है। (Only if "Questions with Answers" is selected)
+                    **Answer:** [True/False] (Only if "Questions with Answers" is selected)
 
-                        **True/False Example:**
+                    **Question 1 (Hindi):** [Your statement in Hindi] (Chapter: [Chapter Name])
 
-                        **Question 1 (English):** [Your statement here] (Chapter: [Extracted Chapter Name])
+                    **Answer:** [True/False] (Only if "Questions with Answers" is selected)
 
-                        **Answer 1 (English):** [True/False] (if required) (Only if "Questions with Answers" is selected)
+                    Generate exactly {} questions based on the provided instructions and in the specified language(s).
+                    """
 
-                        **Question 1 (Hindi):** [Your statement here] (Chapter: [Extracted Chapter Name])
 
-                        **Answer 1 (Hindi):** [True/False] (if required) (Only if "Questions with Answers" is selected)
-
-                        Generate exactly {} questions in the specified language(s) based on the above instructions.
-                 """
 
 ai_topic_prompt_questions= """ Based on the context, extract only questions
                                Remember to keep all the information as it is. Response - {}
                            """
 
-mcq_test_prompt =          """ Based on the context generate terminologies and key terms
-                               first generate terminologies then generate key terms
-                               language - {}
-                               generate the response,
-                               If "English" is selected, generate questions only in English.
-                               If "Hindi" is selected, generate questions only in Hindi.
-                               please if selected hindi then generate response proper way 
-                               first generate terminologies then generate key terms
-                               make sure only generate the terminologies and key terms only.
+mcq_test_prompt = """
+                    Based on the context, generate **terminologies** and **key terms**. Please follow these instructions:
 
-                               Remember to keep all the information as it is. Response-{}    
-                           """
+                    1. **Language**: {} 
+                        - If "English" is selected, generate the response only in English.
+                        - If "Hindi" is selected, generate the response only in Hindi.
+                        - If "English and Hindi" is selected, generate the response first in English, followed by the same response in Hindi.
+
+                    2. **Order of Response**:
+                        - First, generate **terminologies**.
+                        - Then, generate **key terms**.
+
+                    3. **Instructions**:
+                        - If "English" is selected, generate the entire response in English.
+                        - If "Hindi" is selected, generate the entire response in Hindi.
+                        - If "English and Hindi" is selected, generate each terminology and key term first in English, followed by its Hindi translation.
+                        
+                        - Make sure to generate only **terminologies** and **key terms**.
+                        - Do not generate any additional information.
+                        
+                    4. **Example Format** (for "English and Hindi" selection):
+                        **Terminologies (English):** [List of terminologies in English]
+                        
+                        **Terminologies (Hindi):** [List of terminologies in Hindi]
+                        
+                        **Key Terms (English):** [List of key terms in English]
+                        
+                        **Key Terms (Hindi):** [List of key terms in Hindi]
+
+                    Remember to keep all the information exactly as provided. Response - {}
+                    """
+
 
 key_term_prompt = """
                     Based on the context generate key terms
@@ -224,16 +251,25 @@ key_term_prompt = """
                   """
 
 learn_outcome_prompt = """
-                        Based on the context generate learning outcomes
-                        language - {}
-                        generate the response,
-                        If "English" is selected, generate questions only in English.
-                        If "Hindi" is selected, generate questions only in Hindi.
-                        please if selected hindi then generate response,
-                        make sure only generate the learning outcomes only.
-                        Remember to keep all the information as it is. Response-{} 
-                            
+                    Based on the context, generate **learning outcomes**. Please follow these instructions:
+
+                    1. **Language**: {}
+                        - If "English" is selected, generate the response only in English.
+                        - If "Hindi" is selected, generate the response only in Hindi.
+                        - If "English and Hindi" is selected, generate the response first in English, followed by the same response in Hindi.
+
+                    2. **Instructions**:
+                        - If "English" is selected, generate the learning outcomes entirely in English.
+                        - If "Hindi" is selected, generate the learning outcomes entirely in Hindi.
+                        - If "English and Hindi" is selected, generate each learning outcome first in English, followed by its Hindi translation.
+                        
+                    3. **Output**:
+                        - Only generate **learning outcomes**.
+                        - Do not include any additional information.
+
+                    Remember to keep all the information exactly as provided. Response - {}
                     """
+
 student_prompt = """Based on query {} generate response from context {}"""
 
 
@@ -285,40 +321,45 @@ master_prompt = """
 
                 """
 ai_topic_prompt2 = """
-                            Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
+                Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
 
-                            Terminal: {}
-                            Language: {}
+                1. **Terminal**: {}
+                2. **Language**: {} 
+                    - If the selected language is "English", generate all questions and instructions in **English only**.
+                    - If the selected language is "Hindi", generate all questions and instructions in **Hindi only**.
+                    - If the selected language is "English and Hindi", generate the questions first in **English**, followed by the same question in **Hindi**.
 
-                            Please note the following instructions:
-                            - If the selected language is "English", generate all questions and instructions in **English only**.
-                            - If the selected language is "Hindi", generate all questions and instructions in **Hindi only**.
+                3. **Maximum Marks**: 80 (shown in the top right corner)
 
-                            Maximum Marks: 80 (shown in the top right corner)
-                            Question Paper Format:
+                ### Question Paper Format:
 
-                            Objective Section
+                #### Objective Section
 
-                            Multiple Choice Questions (MCQs): 5 questions, each carrying 1 mark.
-                            Each question should have 4 options (a, b, c, d) and test basic knowledge and understanding of the subject.
+                1. **Multiple Choice Questions (MCQs)**: 5 questions, each carrying 1 mark.
+                    - Each question should have 4 options (a, b, c, d) and test basic knowledge and understanding of the subject.
+                    - If the language is "English and Hindi", generate the question and its options first in English, then repeat in Hindi.
 
-                            Subjective Section
+                #### Subjective Section
 
-                            Fill in the Blanks: 5 questions, each carrying 1 mark.
-                            Assess specific knowledge related to the topic.
+                2. **Fill in the Blanks**: 5 questions, each carrying 1 mark.
+                    - These questions should assess specific knowledge related to the topic.
 
-                            True/False Statements: 5 questions, each carrying 1 mark.
-                            Test students’ ability to identify the correctness of the statements.
+                3. **True/False Statements**: 5 questions, each carrying 1 mark.
+                    - These should test students’ ability to identify the correctness of the statements.
 
-                            One-word Answers: 5 questions, each carrying 1 mark.
-                            Test precise knowledge and terminology.
+                4. **One-word Answers**: 5 questions, each carrying 1 mark.
+                    - These questions should test precise knowledge and terminology.
 
-                            Short Answer Questions: 5 questions, each carrying 5 marks.
-                            Require brief but detailed responses.
+                5. **Short Answer Questions**: 5 questions, each carrying 5 marks.
+                    - Require brief but detailed responses, ensuring clarity and accuracy.
 
-                            Long Answer Questions: 5 questions, each carrying 10 marks.
-                            Require detailed explanations and in-depth understanding.
-                            """
+                6. **Long Answer Questions**: 5 questions, each carrying 10 marks.
+                    - Require detailed explanations and in-depth understanding of the topic.
+
+                ### Language Handling:
+                - If "English and Hindi" is selected, generate the entire question paper first in English, followed by the same content in Hindi.
+               """
+
 
 
 lang_prompt = """ Translate the below response to {} language . 
