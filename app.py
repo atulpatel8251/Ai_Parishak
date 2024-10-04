@@ -1,5 +1,5 @@
 import json
-import pdfplumber
+
 from langchain_community.llms import OpenAI
 import chat
 import openai
