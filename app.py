@@ -888,7 +888,8 @@ if st.session_state.teach == 'Teachers':
                     # Initialize combined_text if it doesn't exist
                     if 'combined_text' not in st.session_state:
                         st.session_state.combined_text = None
-
+                    if 'final_text' not in st.session_state:  # Initialize final_text here
+                        st.session_state.final_text = None
                     if selected_file:
                         progress_bar = st.progress(0)
                         status_text = st.empty()
@@ -991,7 +992,8 @@ if st.session_state.teach == 'Teachers':
                         index=0,
                         key="lang"
                     )
-
+                    if 'final_text' not in st.session_state:  # Initialize final_text here
+                        st.session_state.final_text = None
                     if selected_files:
                         progress_bar = st.progress(0)
                         status_text = st.empty()
@@ -1085,6 +1087,8 @@ if st.session_state.teach == 'Teachers':
                         index=0,
                         key="lang"
                     )
+                    if 'final_text' not in st.session_state:  # Initialize final_text here
+                        st.session_state.final_text = None
 
                     if selected_files:
                         progress_bar = st.progress(0)
@@ -1540,101 +1544,105 @@ if st.session_state.teach == 'Teachers':
 if st.session_state.teach=='Students':
     choose=st.radio("Select Options",("Pre Uploaded","Ask a Query","Text Analyzer"),horizontal=True)
     if choose == "Pre Uploaded":
-        subjects_folder = "./preuploaded"
-        
-        # Initialize Chroma DB
-        vector_store = initialize_chroma()
-
-        # List subjects
-        subjects_list = [d for d in os.listdir(subjects_folder) if os.path.isdir(os.path.join(subjects_folder, d))]
-        subjects_list.sort()
-        subjects_list.insert(0, "Select subject")
-
-        selected_subject = st.selectbox("Select a subject", subjects_list, index=0, key='subject_selector')
-
-        if selected_subject != "Select subject":
-            # List chapters for the selected subject
+            os.environ['OMP_THREAD_LIMIT'] = str(multiprocessing.cpu_count())
+            
+            subjects_folder = "./preuploaded"
+            subjects_list = [d for d in os.listdir(subjects_folder) if os.path.isdir(os.path.join(subjects_folder, d))]
+            subjects_list.sort()
+            subjects_list.insert(0, "Select subject")
+            
+            selected_subject = st.selectbox("Select a subject", subjects_list, index=None, key='subject_selector')
+            
+            if selected_subject and selected_subject != "Select subject":
             folder_path = os.path.join(subjects_folder, selected_subject)
             files_list = list_files(folder_path)
             files_list = [remove_extension(filename) for filename in files_list]
-            files_list.sort()
-            files_list.insert(0, "All Chapters")
-
-            selected_file = st.selectbox("Select a chapter (optional)", files_list, index=0, key='chapter_selector')
-
-            # Initialize text variable
-            st.session_state.text = ""
-
-            if selected_file == "All Chapters":
-                for file in files_list[1:]:  # Skip "All Chapters" option
-                    pdf_file_path = os.path.join(folder_path, file + '.pdf')
-                    st.session_state.text += pdf_to_text(pdf_file_path) + "\n"
-            elif selected_file != "Select chapter":
-                st.session_state.filename = []
-                pdf_file_path = os.path.join(folder_path, selected_file + '.pdf')
-                st.session_state.filename.append(selected_file)
-                st.session_state.text = pdf_to_text(pdf_file_path)
-
-            # Once text is extracted, generate embeddings and store in Chroma only once
-            if st.session_state.text:
-                create_and_store_embeddings(st.session_state.text, selected_subject, selected_file, vector_store)
-
-            if st.session_state.text:
-                # Input settings
-                with st.form(key="Pre Uploaded"):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.session_state.complexity = st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'], index=0, key="mode")
-                        st.session_state.no_of_questions = st.number_input('No. of Questions to generate*', key="ai_questions", step=1, max_value=30)
-                        st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Only Questions', 'Questions with Answers'], index=0, key="quesansw")
-                    with col2:
-                        st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Short Questions', 'Long Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0)
-                        st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi','English', 'English and Hindi'], index=0, key="lang")
-                    submitted = st.form_submit_button("Submit")
-                    # Button to trigger processing
-
-                if submitted and st.session_state.text and st.session_state.mode_of_questions != 'Select Option':
-                    # Query the vector store for relevant text chunks before generating questions
-                    results = vector_store.similarity_search(st.session_state.text, k=5)
-
-# Manually filter the results based on the subject and chapter
-                    filtered_results = []
-                    for result in results:
-                        if result.metadata.get("subject") == selected_subject and result.metadata.get("chapter") == selected_file:
-                            filtered_results.append(result)
-
-                    # Use filtered_results for further processing
-                    if filtered_results:
-                        relevant_text = " ".join([res.page_content for res in filtered_results])
-
-                        # Pass relevant text to the LLM for question generation
-                        st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
-                        chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
-                        formatted_output = st.session_state.llm.predict(input=ai_topic_prompt1.format(
-                            chapter_info,
-                            st.session_state.no_of_questions,
-                            relevant_text,  # Use relevant text from vector store
-                            st.session_state.language,
-                            st.session_state.mode_of_questions,
-                            st.session_state.type_of_questions,
-                            st.session_state.complexity,
-                            st.session_state.no_of_questions
-                        ))
-
-                        st.info(formatted_output)
-                        markdown_to_pdf(formatted_output, 'question.pdf')
-                        word_doc = create_word_doc(formatted_output)
-                        doc_buffer = download_doc(word_doc)
-
-                        st.download_button(
-                            label="Download Word Document",
-                            data=doc_buffer,
-                            file_name="generated_document.docx",
-                            mime="application/octet-stream",
-                            key='worddownload'
-                        )
-                    else:
-                        st.info("No relevant results found based on the subject and chapter metadata.") 
+            files_list.insert(0, "Select documents")
+            
+            selected_file = st.multiselect(
+            "Select files (or select all)",
+            ["Select All"] + files_list,
+            key='terminologies_selected_files'
+            )
+            
+            if "Select All" in selected_file:
+            selected_files = files_list[1:]
+            elif "Select documents" in selected_file:
+            selected_file.remove("Select documents")
+            
+            vector_store = initialize_chroma()  # Replace with your initialization logic
+            
+            # Initialize combined_text if it doesn't exist
+            if 'combined_text' not in st.session_state:
+            st.session_state.combined_text = None
+            if 'final_text' not in st.session_state:  # Initialize final_text here
+            st.session_state.final_text = None
+            if selected_file:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            combined_text, processed_files = batch_process_pdfs_with_cache(
+            selected_file,
+            folder_path,
+            progress_bar,
+            status_text
+            )
+            #st.write(combined_text)
+            if combined_text:
+            status_text.text("Generating terminologies and keyterms...")
+            st.session_state.final_text = "\n\n".join(combined_text)
+            #st.write(st.session_state.final_text)
+            
+            # Handling form for question generation
+            with st.form(key="Pre Uploaded"):
+            col1, col2 = st.columns(2)
+            with col1:
+            st.session_state.complexity = st.selectbox('Complexity Mode Required?*', ['Easy', 'Difficult'], index=0, key="mode")
+            st.session_state.no_of_questions = st.number_input('No. of Questions to generate*', key="ai_questions", step=1, max_value=30)
+            st.session_state.mode_of_questions = st.selectbox('Choose Answer Required/Not*', ['Only Questions', 'Questions with Answers'], index=0, key="quesansw")
+            with col2:
+            st.session_state.type_of_questions = st.selectbox('Choose Question Type*', ['Short Questions', 'Long Questions', 'MCQ', 'Fill in the Blanks', 'True and False'], index=0)
+            st.session_state.language = st.selectbox('Choose Response Language Mode*', ['Hindi', 'English', 'English and Hindi'], index=0, key="lang")
+            submitted = st.form_submit_button("Submit")
+            
+            if submitted and st.session_state.final_text and st.session_state.mode_of_questions != 'Select Option':
+            #results = vector_store.similarity_search(st.session_state.final_text, k=5)
+            #results=st.session_state.final_text
+            #filtered_results = []
+            #for result in st.session_state.final_text:
+            #    if result.metadata.get("subject") == selected_subject and result.metadata.get("chapter") in selected_file:
+            #        filtered_results.append(result)
+            
+            if st.session_state.final_text:
+            #relevant_text = " ".join([res.page_content for res in filtered_results])
+            
+            st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
+            chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
+            formatted_output = st.session_state.llm.predict(input=ai_topic_prompt1.format(
+            chapter_info,
+            st.session_state.no_of_questions,
+            st.session_state.final_text,
+            st.session_state.language,
+            st.session_state.mode_of_questions,
+            st.session_state.type_of_questions,
+            st.session_state.complexity,
+            st.session_state.no_of_questions
+            ))
+            
+            st.info(formatted_output)
+            markdown_to_pdf(formatted_output, 'question.pdf')
+            word_doc = create_word_doc(formatted_output)
+            doc_buffer = download_doc(word_doc)
+            
+            st.download_button(
+            label="Download Word Document",
+            data=doc_buffer,
+            file_name="generated_document.docx",
+            mime="application/octet-stream",
+            key='worddownload'
+            )
+            else:
+            st.info("No relevant results found based on the subject and chapter metadata.") 
 
 # Main app logic
 
