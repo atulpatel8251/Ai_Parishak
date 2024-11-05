@@ -1575,7 +1575,8 @@ if st.session_state.teach=='Students':
             # Initialize combined_text if it doesn't exist
             if 'combined_text' not in st.session_state:
                 st.session_state.combined_text = None
-
+             if 'final_text' not in st.session_state:  # Initialize final_text here
+                 st.session_state.final_text = None
             if selected_file:
                 progress_bar = st.progress(0)
                 status_text = st.empty()
