@@ -431,7 +431,8 @@ class OCRCache:
             'cache_file': f"{file_hash}.txt"
         }
         self.save_cache_index(cache_index)
-
+                
+cache_system = CacheSystem() 
 def extract_text_with_ocr_cached(pdf_file_path, cache_system):
     """Extract text from PDF using cache if available"""
     # Check cache first
