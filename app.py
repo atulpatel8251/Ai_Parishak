@@ -2,8 +2,6 @@ import os
 import json
 import hashlib
 import multiprocessing
-import concurrent.futures
-import pathlib
 from datetime import datetime
 from PIL import Image
 import pytesseract
@@ -13,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 class OCRCache:
-    def __init__(self, cache_dir="./ocr_cache"):
+    def __init__(self, cache_dir="/tmp/ocr_cache"):
         self.cache_dir = cache_dir
         self.cache_index_file = os.path.join(cache_dir, "cache_index.json")
         self.initialize_cache()
@@ -50,8 +48,8 @@ class OCRCache:
                 try:
                     with open(cache_file, 'r', encoding='utf-8') as f:
                         return f.read()
-                except Exception:
-                    return None
+                except Exception as e:
+                    st.error(f"Error loading cache: {e}")
         return None
     
     def save_text_to_cache(self, file_path, text):
@@ -80,32 +78,8 @@ def optimize_image_for_ocr(image):
     image = Image.fromarray(np.uint8(np.clip((np.array(image) * 1.2), 0, 255)))
     return image
 
-def setup_tesseract(base_path="./Tesseract-OCR"):
-    try:
-        tesseract_base = pathlib.Path(base_path).absolute()
-        tesseract_cmd = tesseract_base / "tesseract"
-        tessdata_dir = tesseract_base / "tessdata"
-        pytesseract.pytesseract.tesseract_cmd = str(tesseract_cmd)
-        os.environ['TESSDATA_PREFIX'] = str(tessdata_dir)
-        
-        test_image = Image.new('RGB', (1, 1), color='white')
-        test_image_path = 'test_ocr.png'
-        test_image.save(test_image_path)
-        
-        pytesseract.image_to_string(test_image_path, lang='eng')
-        st.success("Tesseract setup completed successfully!")
-        return True
-    except Exception as e:
-        st.error(f"Tesseract setup failed. Error: {str(e)}")
-        return False
-
 def process_page(img, language='hin+eng'):
     try:
-        if not hasattr(process_page, 'tesseract_initialized'):
-            process_page.tesseract_initialized = setup_tesseract()
-            if not process_page.tesseract_initialized:
-                raise Exception("Tesseract not properly initialized")
-        
         img = optimize_image_for_ocr(img)
         custom_config = r'--oem 3 --psm 6 -c preserve_interword_spaces=1'
         text = pytesseract.image_to_string(img, lang=language, config=custom_config)
@@ -151,7 +125,7 @@ def main():
         
         for i, pdf_file in enumerate(uploaded_files):
             # Save uploaded PDF to a temporary location
-            temp_file_path = os.path.join("./temp", pdf_file.name)
+            temp_file_path = os.path.join("/tmp", pdf_file.name)
             with open(temp_file_path, "wb") as f:
                 f.write(pdf_file.getbuffer())
             
