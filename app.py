@@ -905,7 +905,7 @@ if st.session_state.teach == 'Teachers':
                         if combined_text:
                             status_text.text("Generating terminologies and keyterms...")
                             st.session_state.final_text = "\n\n".join(combined_text)
-                            #st.write(st.session_state.final_text)
+                            st.write(st.session_state.final_text)
 
                         # Handling form for question generation
                         with st.form(key="Pre Uploaded"):
