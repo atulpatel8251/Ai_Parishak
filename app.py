@@ -432,10 +432,10 @@ class OCRCache:
         }
         self.save_cache_index(cache_index)
                 
-cache_system = OCRCache() 
 def extract_text_with_ocr_cached(pdf_file_path, cache_system):
     """Extract text from PDF using cache if available"""
     # Check cache first
+    st.write(f"Attempting to process {pdf_file_path}")        
     cached_text = cache_system.get_cached_text(pdf_file_path)
     if cached_text is not None:
         st.info(f"Using cached text for {os.path.basename(pdf_file_path)}")
