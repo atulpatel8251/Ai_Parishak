@@ -367,7 +367,7 @@ import concurrent.futures
 
 
 class OCRCache:
-    def __init__(self, cache_dir="./Ai_Parishak/ocr_cache"):
+    def __init__(self, cache_dir="./ocr_cache"):
         """Initialize OCR cache system"""
         self.cache_dir = cache_dir
         self.cache_index_file = os.path.join(cache_dir, "cache_index.json")
@@ -491,7 +491,7 @@ from PIL import Image
 import pytesseract
 import streamlit as st
 
-def setup_tesseract(base_path="./Ai_Parishak/Tesseract-OCR"):
+def setup_tesseract(base_path="./Tesseract-OCR"):
     """Configure Tesseract environment using Tesseract-OCR folder structure"""
     try:
         # Convert to Path object and resolve absolute path
