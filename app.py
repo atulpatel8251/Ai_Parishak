@@ -367,7 +367,7 @@ import concurrent.futures
 
 
 class OCRCache:
-    def __init__(self, cache_dir="./ocr_cache"):
+    def __init__(self, cache_dir="./Ai_Parishak/ocr_cache"):
         """Initialize OCR cache system"""
         self.cache_dir = cache_dir
         self.cache_index_file = os.path.join(cache_dir, "cache_index.json")
@@ -491,35 +491,27 @@ from PIL import Image
 import pytesseract
 import streamlit as st
 
-def setup_tesseract(base_path="./Tesseract-OCR"):
-    """
-    Configure Tesseract environment using Tesseract-OCR folder structure
-    
-    Args:
-        base_path (str): Path to Tesseract-OCR directory (default: "./Tesseract-OCR")
-        
-    Returns:
-        bool: True if setup successful, False otherwise
-    """
+def setup_tesseract(base_path="./Ai_Parishak/Tesseract-OCR"):
+    """Configure Tesseract environment using Tesseract-OCR folder structure"""
     try:
         # Convert to Path object and resolve absolute path
         tesseract_base = pathlib.Path(base_path).absolute()
-        
+
         # Set paths directly from Tesseract-OCR folder
         tesseract_cmd = tesseract_base / "tesseract"
         tessdata_dir = tesseract_base / "tessdata"
-        
+
         # Set Tesseract command path
         pytesseract.pytesseract.tesseract_cmd = str(tesseract_cmd)
-        
+
         # Set TESSDATA_PREFIX environment variable
         os.environ['TESSDATA_PREFIX'] = str(tessdata_dir)
-        
+
         # Quick test
         test_image = Image.new('RGB', (1, 1), color='white')
         test_image_path = 'test_ocr.png'
         test_image.save(test_image_path)
-        
+
         try:
             pytesseract.image_to_string(test_image_path, lang='eng')
             st.success("Tesseract setup completed successfully!")
@@ -527,7 +519,7 @@ def setup_tesseract(base_path="./Tesseract-OCR"):
         finally:
             if os.path.exists(test_image_path):
                 os.remove(test_image_path)
-                
+
     except Exception as e:
         st.error(f"""Tesseract setup failed. Please check:
         1. Tesseract is installed in: {base_path}
