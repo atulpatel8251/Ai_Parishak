@@ -1,6 +1,7 @@
 import logging
 
 logger = logging.getLogger(__name__)
+# prompts.py
 
 
 '''SYSTEM_PROMPTS = {
@@ -110,7 +111,6 @@ ai_prompt = """
             Response - {}
             """
 
-
 ai_topic_prompt = """
                     Based on the context, generate only questions considering the following constraints:
                     1. Topic of questions - {}
@@ -129,6 +129,24 @@ ai_topic_prompt = """
                     Generate all types of questions and answers, ensuring that they are based on the topic or text. 
                     Please remember to keep all the information as it is.
                 """
+ai_topic_prompt5 = """
+    Based on the context, generate only questions considering the following constraints:
+    1. Topic of questions - {}
+    2. Number of questions - {} 
+    3. Mode of questions - {}
+    4. Type of questions - {}
+    5. Level of questions - {}
+    6. Language - {}
+
+    Generate questions with the following structure:
+    - Each question should have four options (Option 1, Option 2, Option 3, Option 4).
+    - Include a correct answer for each question.
+    - If "English" is selected, generate questions only in English.
+    - If "Hindi" is selected, generate questions only in Hindi.
+    - If "English and Hindi" is selected, generate both English and Hindi versions of the questions.
+
+    If answers are required, ensure they are clearly marked.
+    """
 
 
 
@@ -321,45 +339,129 @@ master_prompt = """
 
                 """
 ai_topic_prompt2 = """
-                Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
+Generate a question paper for the Madhya Pradesh School Education Board following the exam format.
 
-                1. **Terminal**: {}
-                2. **Language**: {} 
-                    - If the selected language is "English", generate all questions and instructions in **English only**.
-                    - If the selected language is "Hindi", generate all questions and instructions in **Hindi only**.
-                    - If the selected language is "English and Hindi", generate the questions first in **English**, followed by the same question in **Hindi**.
+Terminal: {0}
+Chapters Covered: {2}
+Maximum Marks: 80
 
-                3. **Maximum Marks**: 80 (shown in the top right corner)
+Instructions:
+- Language Mode: {1}
+  * English: All content in English only
+  * Hindi: All content in Hindi only
+  * English and Hindi: Each question presented in both languages
 
-                ### Question Paper Format:
+Question Paper Format:
 
-                #### Objective Section
+Part A: Objective Section (Total: 15 marks)
+----------------------------------------
+1. Multiple Choice Questions (5 × 1 = 5 marks)
+   - Four options (a, b, c, d) for each question
+   - Test basic concept understanding
 
-                1. **Multiple Choice Questions (MCQs)**: 5 questions, each carrying 1 mark.
-                    - Each question should have 4 options (a, b, c, d) and test basic knowledge and understanding of the subject.
-                    - If the language is "English and Hindi", generate the question and its options first in English, then repeat in Hindi.
+2. Fill in the Blanks (5 × 1 = 5 marks)
+   - Focus on specific topic knowledge
 
-                #### Subjective Section
+3. True/False Questions (5 × 1 = 5 marks)
+   - Test statement validity comprehension
 
-                2. **Fill in the Blanks**: 5 questions, each carrying 1 mark.
-                    - These questions should assess specific knowledge related to the topic.
+Part B: Short Answer Section (25 marks)
+----------------------------------------
+4. One-word Answers (5 × 1 = 5 marks)
+   - Test precise terminology knowledge
 
-                3. **True/False Statements**: 5 questions, each carrying 1 mark.
-                    - These should test students’ ability to identify the correctness of the statements.
+5. Short Answer Questions (4 × 5 = 20 marks)
+   - Brief but detailed responses required
+   - Clear and accurate answers expected
 
-                4. **One-word Answers**: 5 questions, each carrying 1 mark.
-                    - These questions should test precise knowledge and terminology.
+Part C: Long Answer Section (40 marks)
+----------------------------------------
+6. Long Answer Questions (4 × 10 = 40 marks)
+   - Detailed explanations required
+   - Test in-depth understanding
+   - Include analysis and examples
 
-                5. **Short Answer Questions**: 5 questions, each carrying 5 marks.
-                    - Require brief but detailed responses, ensuring clarity and accuracy.
+Note: Questions should be based on the material from: {2}
 
-                6. **Long Answer Questions**: 5 questions, each carrying 10 marks.
-                    - Require detailed explanations and in-depth understanding of the topic.
+Language Instructions:
+- For "English and Hindi" mode, present each question in English followed by its Hindi translation
+- Maintain consistent formatting across both languages
+- Include appropriate section headers in both languages when applicable
+"""
+ai_topic_prompt3 = """
+                    Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
 
-                ### Language Handling:
-                - If "English and Hindi" is selected, generate the entire question paper first in English, followed by the same content in Hindi.
-               """
+                    Terminal: {}
+                    Language: {}
 
+
+                    If the selected language is "English", generate all questions and instructions in English only.
+                    If the selected language is "Hindi", generate all questions and instructions in Hindi only.
+                    If the selected language is "English and Hindi", generate the questions first in English, followed by the same question in Hindi.
+
+
+                    Maximum Marks: 80 (shown in the top right corner)
+
+                    Question Paper Format:
+                    Objective Section
+
+                    Multiple Choice Questions (MCQs): 5 questions, each carrying 1 mark.
+
+
+                    Each question should have 4 options (a, b, c, d) and test basic knowledge and understanding of the subject.
+                    Format:
+                    CopyQ1. Question text
+                        a) Option 1
+                        b) Option 2
+                        c) Option 3
+                        d) Option 4
+
+                    [Your answer for Q1 (write your answer below):]
+
+
+                    Subjective Section
+
+                    Fill in the Blanks: 5 questions, each carrying 1 mark.
+
+
+                    These questions should assess specific knowledge related to the topic.
+                    Format:
+                    CopyQ6. Fill in the blank: ________________
+
+                    [Your answer for Q6 (write your answer below):]
+
+
+
+                    True/False Statements: 5 questions, each carrying 1 mark.
+
+
+                    These should test students' ability to identify the correctness of the statements.
+                    Format:
+                    CopyQ11. Statement (True/False): 
+
+                    [Your answer for Q11 (write your answer below):]
+
+
+
+                    One-word Answers: 5 questions, each carrying 1 mark.
+
+
+                    These questions should test precise knowledge and terminology.
+                    Format:
+                    CopyQ16. Question requiring one-word answer: 
+
+                    [Your answer for Q16 (write your answer below):]
+
+
+                    Format Specifications:
+
+                    Do not include any text input area for headings such as Maximum Marks, Objective Section, Multiple Choice Questions (MCQs), Fill in the Blanks, True/False Statements, or One-word Answers.
+                    Present each question on a new line, preceded by its question number (e.g., Q1, Q2, etc.).
+                    List options for MCQs on separate lines, indented under the question.
+                    Include the answer text area ("[Your answer for Qx (write your answer below):]") only after individual questions, not after section headings.
+                    Do not include any additional text, explanations, or answer prompts after the questions.
+                    Ensure consistent formatting for easy parsing of questions.
+                    """
 
 
 lang_prompt = """ Translate the below response to {} language . 
