@@ -932,7 +932,7 @@ if st.session_state.teach == 'Teachers':
                         submitted = st.form_submit_button("Submit")
             
                     if submitted and hasattr(st.session_state, 'final_text') and st.session_state.mode_of_questions != 'Select Option':
-                        st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4", temperature=0.7, api_key=openai_api_key2))
+                        st.session_state.llm = ConversationChain(llm=ChatOpenAI(model="gpt-4o", temperature=0.7, api_key=openai_api_key2))
                         chapter_info = f"Chapter: {selected_file}" if selected_file != "All Chapters" else "All Chapters"
                         
                         formatted_output = st.session_state.llm.predict(input=ai_topic_prompt1.format(
