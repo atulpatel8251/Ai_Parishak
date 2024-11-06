@@ -662,16 +662,16 @@ def batch_process_pdfs(selected_files, folder_path, progress_bar, status_text):
     return combined_text, processed_files    
 
 def batch_process_pdfs_with_cache(selected_files, folder_path, progress_bar, status_text):
-    """Process multiple PDFs using hybrid cache system"""
+    """Process multiple PDFs using cache when available"""
     total_files = len(selected_files)
     combined_text = []
     processed_files = []
     
-    # Initialize cache system with specific directory
-    cache_system = OCRCache(cache_dir="./ocr_cache")
+    # Initialize cache system
+    cache_system = OCRCache()
     
     # Process files in smaller batches
-    batch_size = 2
+    batch_size = 3
     for i in range(0, total_files, batch_size):
         batch = selected_files[i:i + batch_size]
         
