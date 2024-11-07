@@ -492,6 +492,9 @@ import pytesseract
 import streamlit as st
 
 def setup_tesseract(base_path="./Tesseract-OCR"):
+    """
+    Configure Tesseract for both local and cloud environments
+    """
     try:
         # Check for Streamlit Cloud's Tesseract installation
         if os.path.exists('/usr/bin/tesseract'):
@@ -499,7 +502,7 @@ def setup_tesseract(base_path="./Tesseract-OCR"):
         else:
             # For local development
             pytesseract.pytesseract.tesseract_cmd = 'tesseract'
-
+        
         # Quick test
         test_image = Image.new('RGB', (1, 1), color='white')
         pytesseract.image_to_string(test_image)
@@ -507,6 +510,14 @@ def setup_tesseract(base_path="./Tesseract-OCR"):
         return True
     except Exception as e:
         st.error(f"Tesseract setup failed: {str(e)}")
+        return False
+                
+    except Exception as e:
+        st.error(f"""Tesseract setup failed. Please check:
+        1. Tesseract is installed in: {base_path}
+        2. Language files are present in: {tessdata_dir}
+        
+        Error: {str(e)}""")
         return False
 
 
