@@ -151,14 +151,11 @@ ai_topic_prompt5 = """
 
 
 ai_topic_prompt1 = """
-                    You are provided with a document containing text related to a specific topic. Generate questions and answers based solely on the provided text, following these constraints:
+                    You are provided with a document containing text related to a specific topic. Generate questions and answers solely based on the provided text, following these constraints:
 
                     1. **Number of Questions**: {} (Generate exactly this number of questions. Neither more nor less.)
-                    2. **Text**: {}   
-                    3. **Language**: {} 
-                        - If "English" is selected, generate only English questions and answers.
-                        - If "Hindi" is selected, generate only Hindi questions and answers.
-                        - If "English and Hindi" is selected, generate each question first in English, followed by the Hindi translation of the same question.
+                    2. **Text**: {}
+                    3. **Language**: Generate questions and answers in the document's language (Hindi or English), based on the medium selected by the user.
                     4. **Mode of Questions**: {} (Questions only / Questions with Answers)
                     5. **Type of Questions**: {} (Short Questions / Long Questions / MCQ / Fill in the Blanks / True and False)
                     6. **Complexity Level**: {} (Easy / Difficult)
@@ -167,14 +164,9 @@ ai_topic_prompt1 = """
                     ### Instructions:
                     - **Use only the content from the provided text** to generate the questions and answers.
                     - **Do not use any external sources**.
-
+                    
                     - **If "Questions only" is selected**, generate only questions without answers.
                     - **If "Questions with Answers" is selected**, provide answers immediately following each question.
-
-                    - **Language Instructions**:
-                        - If "English" is selected, generate questions and answers only in English.
-                        - If "Hindi" is selected, generate questions and answers only in Hindi.
-                        - If "English and Hindi" is selected, generate each question first in English, followed by its Hindi version.
 
                     - **MCQ Format**:
                         For multiple-choice questions, provide 4 options on separate lines, followed by the correct answer on the next line.
@@ -183,8 +175,8 @@ ai_topic_prompt1 = """
 
                     **For MCQs**:
 
-                    **Question 1 (English):** [Your question here] (Chapter: [Chapter Name])
-                    
+                    **Question 1:** [Your question here] (Chapter: [Chapter Name])
+
                     **a.** [Option 1]  
                     **b.** [Option 2]  
                     **c.** [Option 3]  
@@ -192,37 +184,21 @@ ai_topic_prompt1 = """
 
                     **Answer:** [Correct answer here] (Only if "Questions with Answers" is selected)
 
-                    **Question 1 (Hindi):** [Your question in Hindi] (Chapter: [Chapter Name])
-
-                    **क.** [Option 1]  
-                    **ख.** [Option 2]  
-                    **ग.** [Option 3]  
-                    **घ.** [Option 4]
-
-                    **उत्तर:** [Correct answer in Hindi] (Only if "Questions with Answers" is selected)
-
                     **For Fill in the Blanks**:
 
-                    **Question 1 (English):** The ______ is black. (Chapter: [Chapter Name])
+                    **Question 1:** The ______ is black. (Chapter: [Chapter Name])
 
                     **Answer:** The cat is black. (Only if "Questions with Answers" is selected)
 
-                    **Question 1 (Hindi):** ______ काली है। (Chapter: [Chapter Name])
-
-                    **Answer:** बिल्ली काली है। (Only if "Questions with Answers" is selected)
-
                     **For True/False**:
 
-                    **Question 1 (English):** [Your statement here] (Chapter: [Chapter Name])
+                    **Question 1:** [Your statement here] (Chapter: [Chapter Name])
 
                     **Answer:** [True/False] (Only if "Questions with Answers" is selected)
 
-                    **Question 1 (Hindi):** [Your statement in Hindi] (Chapter: [Chapter Name])
-
-                    **Answer:** [True/False] (Only if "Questions with Answers" is selected)
-
-                    Generate exactly {} questions based on the provided instructions and in the specified language(s).
+                    Generate exactly {} questions based on the provided instructions and in the document's language (Hindi or English).
                     """
+
 
 
 
@@ -231,36 +207,30 @@ ai_topic_prompt_questions= """ Based on the context, extract only questions
                            """
 
 mcq_test_prompt = """
-                    Based on the context, generate **terminologies** and **key terms**. Please follow these instructions:
+                    
+                You are an expert in generating subject-specific terminologies. Based on the given text, generate terminologies with their definitions following these strict rules:
 
-                    1. **Language**: {} 
-                        - If "English" is selected, generate the response only in English.
-                        - If "Hindi" is selected, generate the response only in Hindi.
-                        - If "English and Hindi" is selected, generate the response first in English, followed by the same response in Hindi.
+                IMPORTANT: Your response must be in {1} language only since user has selected {1} Medium.
 
-                    2. **Order of Response**:
-                        - First, generate **terminologies**.
-                        - Then, generate **key terms**.
+                Instructions for generating terminologies:
+                1. Extract important subject-specific terms from the text
+                2. Provide a clear, concise definition for each term
+                3. Number each terminology
+                4. Present each term and definition on a single line
+                5. Format: Number. Term - Definition
 
-                    3. **Instructions**:
-                        - If "English" is selected, generate the entire response in English.
-                        - If "Hindi" is selected, generate the entire response in Hindi.
-                        - If "English and Hindi" is selected, generate each terminology and key term first in English, followed by its Hindi translation.
-                        
-                        - Make sure to generate only **terminologies** and **key terms**.
-                        - Do not generate any additional information.
-                        
-                    4. **Example Format** (for "English and Hindi" selection):
-                        **Terminologies (English):** [List of terminologies in English]
-                        
-                        **Terminologies (Hindi):** [List of terminologies in Hindi]
-                        
-                        **Key Terms (English):** [List of key terms in English]
-                        
-                        **Key Terms (Hindi):** [List of key terms in Hindi]
+                Here's how to format your response:
 
-                    Remember to keep all the information exactly as provided. Response - {}
-                    """
+                If English Medium is selected:
+                1. Osmosis - Movement of water molecules across a semi-permeable membrane
+                2. Photosynthesis - Process of converting light energy into chemical energy
+
+                If Hindi Medium is selected:
+                1. परासरण - अर्ध-पारगम्य झिल्ली के माध्यम से पानी के अणुओं का संचरण
+                2. प्रकाश-संश्लेषण - प्रकाश ऊर्जा को रासायनिक ऊर्जा में बदलने की प्रक्रिया
+
+                Context text: {0}
+"""
 
 
 key_term_prompt = """
@@ -269,23 +239,30 @@ key_term_prompt = """
                   """
 
 learn_outcome_prompt = """
-                    Based on the context, generate **learning outcomes**. Please follow these instructions:
+                    You are an expert in creating educational learning outcomes. Based on the given text, generate clear learning outcomes following these strict rules:
 
-                    1. **Language**: {}
-                        - If "English" is selected, generate the response only in English.
-                        - If "Hindi" is selected, generate the response only in Hindi.
-                        - If "English and Hindi" is selected, generate the response first in English, followed by the same response in Hindi.
+                    IMPORTANT: Your response must be in {1} language only since user has selected {1} Medium.
 
-                    2. **Instructions**:
-                        - If "English" is selected, generate the learning outcomes entirely in English.
-                        - If "Hindi" is selected, generate the learning outcomes entirely in Hindi.
-                        - If "English and Hindi" is selected, generate each learning outcome first in English, followed by its Hindi translation.
-                        
-                    3. **Output**:
-                        - Only generate **learning outcomes**.
-                        - Do not include any additional information.
+                    Instructions for generating learning outcomes:
+                    1. Extract key learning objectives from the text
+                    2. Start each outcome with an action verb
+                    3. Number each learning outcome
+                    4. Focus on measurable and observable outcomes
+                    5. Format: Number. Learning Outcome
 
-                    Remember to keep all the information exactly as provided. Response - {}
+                    Here's how to format your response:
+
+                    If English Medium is selected:
+                    1. Understand the basic principles of chemical bonding and molecular structure
+                    2. Analyze the relationships between different chemical compounds
+                    3. Apply theoretical concepts to solve numerical problems
+
+                    If Hindi Medium is selected:
+                    1. रासायनिक बंधन और आण्विक संरचना के मूल सिद्धांतों को समझें
+                    2. विभिन्न रासायनिक यौगिकों के बीच संबंधों का विश्लेषण करें
+                    3. सैद्धांतिक अवधारणाओं को संख्यात्मक समस्याओं को हल करने के लिए लागू करें
+
+                    Context text: {0}
                     """
 
 student_prompt = """Based on query {} generate response from context {}"""
@@ -339,55 +316,79 @@ master_prompt = """
 
                 """
 ai_topic_prompt2 = """
-Generate a question paper for the Madhya Pradesh School Education Board following the exam format.
+                You are an expert in creating question papers for the Madhya Pradesh School Education Board. Generate a question paper following these strict rules:
 
-Terminal: {0}
-Chapters Covered: {2}
-Maximum Marks: 80
+                IMPORTANT: Your response must be in {1} language only since user has selected {1} Medium.
 
-Instructions:
-- Language Mode: {1}
-  * English: All content in English only
-  * Hindi: All content in Hindi only
-  * English and Hindi: Each question presented in both languages
+                Subject Material Covered:
+                - Terminologies: {0}
+                - Chapters: {2}
 
-Question Paper Format:
+                Question Paper Structure:
+                Maximum Marks: 80
+                Time Duration: 3 Hours
 
-Part A: Objective Section (Total: 15 marks)
-----------------------------------------
-1. Multiple Choice Questions (5 × 1 = 5 marks)
-   - Four options (a, b, c, d) for each question
-   - Test basic concept understanding
+                Instructions:
+                1. Write all answers in {1} only
+                2. All questions are compulsory
+                3. Marks for each question are indicated
 
-2. Fill in the Blanks (5 × 1 = 5 marks)
-   - Focus on specific topic knowledge
+                Part A: Objective Section (15 marks)
+                ----------------------------------------
+                1. Multiple Choice Questions (5 × 1 = 5 marks)
+                - Create 5 MCQs with options (a, b, c, d)
+                
+                2. Fill in the Blanks (5 × 1 = 5 marks)
+                - Create 5 fill-in-the-blank questions
+                
+                3. True/False Questions (5 × 1 = 5 marks)
+                - Create 5 true/false statements
 
-3. True/False Questions (5 × 1 = 5 marks)
-   - Test statement validity comprehension
+                Part B: Short Answer Section (25 marks)
+                ----------------------------------------
+                4. One-word Answers (5 × 1 = 5 marks)
+                - Create 5 one-word answer questions
+                
+                5. Short Answer Questions (5 × 5 = 25 marks)
+                - Create 5 short answer questions
+                - Each answer should be around 50-75 words
 
-Part B: Short Answer Section (25 marks)
-----------------------------------------
-4. One-word Answers (5 × 1 = 5 marks)
-   - Test precise terminology knowledge
+                Part C: Long Answer Section (40 marks)
+                ----------------------------------------
+                6. Long Answer Questions (5 × 10 = 50 marks)
+                - Create 5 detailed questions
+                - Each answer should be around 200-250 words
+                - Include application-based questions
 
-5. Short Answer Questions (4 × 5 = 20 marks)
-   - Brief but detailed responses required
-   - Clear and accurate answers expected
+                Format Examples:
 
-Part C: Long Answer Section (40 marks)
-----------------------------------------
-6. Long Answer Questions (4 × 10 = 40 marks)
-   - Detailed explanations required
-   - Test in-depth understanding
-   - Include analysis and examples
+                If English Medium is selected:
+                Part A
+                1. Which of the following best describes photosynthesis?
+                a) Energy conversion process
+                b) Cellular division
+                c) Protein synthesis
+                d) None of the above
 
-Note: Questions should be based on the material from: {2}
+                If Hindi Medium is selected:
+                भाग A
+                1. निम्नलिखित में से कौन प्रकाश संश्लेषण का सबसे अच्छा वर्णन करता है?
+                अ) ऊर्जा रूपांतरण प्रक्रिया
+                ब) कोशिका विभाजन
+                स) प्रोटीन संश्लेषण
+                द) उपरोक्त में से कोई नहीं
 
-Language Instructions:
-- For "English and Hindi" mode, present each question in English followed by its Hindi translation
-- Maintain consistent formatting across both languages
-- Include appropriate section headers in both languages when applicable
+                Note:
+                - Questions should be based on provided terminologies and chapters
+                - Maintain consistent difficulty level throughout
+                - Include variety of cognitive levels (knowledge, understanding, application, analysis)
+                - Questions should be clear and unambiguous
+
+                Context Terminologies: {0}
+                Selected Medium: {1}
+                Chapters Covered: {2}
 """
+
 ai_topic_prompt3 = """
                     Generate a question paper for the Madhya Pradesh School Education Board following the exam format. The paper should adhere to the specified structure and constraints:
 
