@@ -369,13 +369,11 @@ import concurrent.futures
 
 class OCRCache:
     def __init__(self, cache_dir="./ocr_cache"):
-        """Initialize OCR cache system with both file and memory storage"""
         self.cache_dir = cache_dir
         self.cache_index_file = os.path.join(cache_dir, "cache_index.json")
         self.initialize_cache()
     
     def initialize_cache(self):
-        """Create cache directory and initialize both file and memory cache"""
         # Initialize session state cache
         if 'ocr_cache' not in st.session_state:
             st.session_state.ocr_cache = {}
@@ -393,6 +391,19 @@ class OCRCache:
             file_content = f.read(1024 * 1024)  # Read first MB for hashing
         hash_string = f"{file_path}_{modification_time}_{file_size}_{file_content}"
         return hashlib.md5(hash_string.encode()).hexdigest()
+    
+    def is_cache_valid(self, file_path, file_hash):
+        """Check if cache is valid for given file"""
+        cache_index = self.load_cache_index()
+        if file_hash in cache_index:
+            cache_file = os.path.join(self.cache_dir, f"{file_hash}.txt")
+            if os.path.exists(cache_file):
+                cached_info = cache_index[file_hash]
+                # Check if file path and modification time match
+                if (cached_info['file_path'] == file_path and 
+                    os.path.getmtime(file_path) == cached_info.get('modification_time')):
+                    return True
+        return False
     
     def load_cache_index(self):
         """Load cache index from file"""
@@ -415,32 +426,41 @@ class OCRCache:
         try:
             file_hash = self.get_file_hash(file_path)
             
+            # First check if cache is valid
+            if not self.is_cache_valid(file_path, file_hash):
+                return None
+            
             # Try memory cache first
             if file_hash in st.session_state.ocr_cache:
+                st.success(f"Using memory cache for {os.path.basename(file_path)}")
                 return st.session_state.ocr_cache[file_hash]
             
             # Try file cache
-            cache_index = self.load_cache_index()
-            if file_hash in cache_index:
-                cache_file = os.path.join(self.cache_dir, f"{file_hash}.txt")
-                if os.path.exists(cache_file):
-                    try:
-                        with open(cache_file, 'r', encoding='utf-8') as f:
-                            text = f.read()
-                            # Store in memory cache for future use
-                            st.session_state.ocr_cache[file_hash] = text
-                            return text
-                    except Exception:
-                        return None
+            cache_file = os.path.join(self.cache_dir, f"{file_hash}.txt")
+            if os.path.exists(cache_file):
+                try:
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        text = f.read()
+                        # Store in memory cache for future use
+                        st.session_state.ocr_cache[file_hash] = text
+                        st.success(f"Using file cache for {os.path.basename(file_path)}")
+                        return text
+                except Exception as e:
+                    st.warning(f"Error reading cache file: {str(e)}")
+                    return None
             return None
         except Exception as e:
             st.warning(f"Cache retrieval error: {str(e)}")
             return None
-    
+
     def save_text_to_cache(self, file_path, text):
         """Save extracted text to both memory and file cache"""
         try:
             file_hash = self.get_file_hash(file_path)
+            
+            # Check if already cached and valid
+            if self.is_cache_valid(file_path, file_hash):
+                return  # Skip if already properly cached
             
             # Save to memory cache
             st.session_state.ocr_cache[file_hash] = text
@@ -454,10 +474,12 @@ class OCRCache:
             cache_index = self.load_cache_index()
             cache_index[file_hash] = {
                 'file_path': file_path,
+                'modification_time': os.path.getmtime(file_path),
                 'cached_date': datetime.now().isoformat(),
                 'cache_file': f"{file_hash}.txt"
             }
             self.save_cache_index(cache_index)
+            st.success(f"Cached text for {os.path.basename(file_path)}")
             
         except Exception as e:
             st.warning(f"Could not save to cache: {str(e)}")
@@ -670,35 +692,62 @@ def batch_process_pdfs_with_cache(selected_files, folder_path, progress_bar, sta
     # Initialize cache system
     cache_system = OCRCache()
     
-    # Process files in smaller batches
-    batch_size = 3
-    for i in range(0, total_files, batch_size):
-        batch = selected_files[i:i + batch_size]
+    # Track which files need processing
+    files_to_process = []
+    cached_texts = {}
+    
+    # First check cache for all files
+    for file in selected_files:
+        file_path = os.path.join(folder_path, file + '.pdf')
+        cached_text = cache_system.get_cached_text(file_path)
         
-        with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            future_to_file = {
-                executor.submit(
-                    extract_text_with_ocr_cached,
-                    os.path.join(folder_path, file + '.pdf'),
-                    cache_system
-                ): file for file in batch
-            }
+        if cached_text is not None:
+            cached_texts[file] = cached_text
+        else:
+            files_to_process.append(file)
+    
+    # Update progress for cached files
+    cached_count = len(cached_texts)
+    if cached_count > 0:
+        progress = (cached_count / total_files)
+        progress_bar.progress(progress)
+        status_text.text(f"Retrieved {cached_count} files from cache")
+    
+    # Process only uncached files
+    if files_to_process:
+        batch_size = 3
+        for i in range(0, len(files_to_process), batch_size):
+            batch = files_to_process[i:i + batch_size]
             
-            for future in concurrent.futures.as_completed(future_to_file):
-                file = future_to_file[future]
-                try:
-                    text = future.result()
-                    if text.strip():
-                        combined_text.append(text)
-                        processed_files.append(file)
-                    
-                    # Update progress
-                    progress = (len(processed_files) / total_files)
-                    progress_bar.progress(progress)
-                    status_text.text(f"Processed {len(processed_files)}/{total_files} files")
-                    
-                except Exception as e:
-                    st.warning(f"Error processing {file}: {str(e)}")
+            with ThreadPoolExecutor(max_workers=batch_size) as executor:
+                future_to_file = {
+                    executor.submit(
+                        extract_text_with_ocr_cached,
+                        os.path.join(folder_path, file + '.pdf'),
+                        cache_system
+                    ): file for file in batch
+                }
+                
+                for future in concurrent.futures.as_completed(future_to_file):
+                    file = future_to_file[future]
+                    try:
+                        text = future.result()
+                        if text.strip():
+                            cached_texts[file] = text
+                        
+                        # Update progress including cached files
+                        progress = (len(cached_texts) / total_files)
+                        progress_bar.progress(progress)
+                        status_text.text(f"Processed {len(cached_texts)}/{total_files} files")
+                        
+                    except Exception as e:
+                        st.warning(f"Error processing {file}: {str(e)}")
+    
+    # Combine texts in original order
+    for file in selected_files:
+        if file in cached_texts:
+            combined_text.append(cached_texts[file])
+            processed_files.append(file)
     
     return combined_text, processed_files    
 
