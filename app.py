@@ -452,7 +452,38 @@ class OCRCache:
         except Exception as e:
             st.warning(f"Could not save to cache: {str(e)}")
 
+def extract_text_with_ocr(pdf_file_path, cache_system):
+    """Extract text from PDF using cache if available"""
+    cached_text = cache_system.get_cached_text(pdf_file_path)
+    if cached_text is not None:
+        st.info(f"Using cached text for {os.path.basename(pdf_file_path)}")
+        return cached_text
 
+    # If not in cache, perform OCR
+    try:
+        images = convert_from_path(
+            pdf_file_path,
+            dpi=200,
+            thread_count=multiprocessing.cpu_count(),
+            grayscale=True,
+            size=(1800, None)
+        )
+
+        max_workers = min(multiprocessing.cpu_count(), len(images))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(process_page, images))
+
+        extracted_text = "\n".join(filter(None, results))
+
+        # Save to cache if extraction was successful
+        if extracted_text.strip():
+            cache_system.save_text_to_cache(pdf_file_path, extracted_text)
+
+        return extracted_text
+
+    except Exception as e:
+        st.error(f"Error during OCR extraction: {str(e)}")
+        return ""
 def extract_text_with_ocr_cached(pdf_file_path, cache_system):
     """Extract text from PDF using cache if available"""
     cached_text = cache_system.get_cached_text(pdf_file_path)
@@ -650,54 +681,23 @@ def batch_process_pdfs_with_cache(selected_files, folder_path, progress_bar, sta
 
     cache_system = OCRCache()
 
-    files_to_process = []
-    cached_texts = {}
-
     for file in selected_files:
         file_path = os.path.join(folder_path, file + '.pdf')
         cached_text = cache_system.get_cached_text(file_path)
         if cached_text is not None:
-            cached_texts[file] = cached_text
-        else:
-            files_to_process.append(file)
-
-    cached_count = len(cached_texts)
-    if cached_count > 0:
-        progress = (cached_count / total_files)
-        progress_bar.progress(progress)
-        status_text.text(f"Retrieved {cached_count} files from cache")
-
-    if files_to_process:
-        batch_size = 3
-        for i in range(0, len(files_to_process), batch_size):
-            batch = files_to_process[i:i + batch_size]
-            with ThreadPoolExecutor(max_workers=batch_size) as executor:
-                future_to_file = {
-                    executor.submit(
-                        extract_text_with_ocr_cached,
-                        os.path.join(folder_path, file + '.pdf'),
-                        cache_system
-                    ): file for file in batch
-                }
-                for future in concurrent.futures.as_completed(future_to_file):
-                    file = future_to_file[future]
-                    try:
-                        text = future.result()
-                        if text.strip():
-                            cached_texts[file] = text
-
-                        # Update progress including cached files
-                        progress = (len(cached_texts) / total_files)
-                        progress_bar.progress(progress)
-                        status_text.text(f"Processed {len(cached_texts)}/{total_files} files")
-
-                    except Exception as e:
-                        st.warning(f"Error processing {file}: {str(e)}")
-
-    for file in selected_files:
-        if file in cached_texts:
-            combined_text.append(cached_texts[file])
+            combined_text.append(cached_text)
             processed_files.append(file)
+        else:
+            # Process file and cache the text
+            extracted_text = extract_text_with_ocr(file_path, cache_system)
+            if extracted_text.strip():
+                combined_text.append(extracted_text)
+                processed_files.append(file)
+
+        # Update progress
+        progress = len(processed_files) / total_files
+        progress_bar.progress(progress)
+        status_text.text(f"Processed {len(processed_files)}/{total_files} files")
 
     return combined_text, processed_files       
 
