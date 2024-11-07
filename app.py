@@ -46,7 +46,7 @@ from io import StringIO
 import shutil
 #from docxlatex import Document
 # from PIL import Image
-client = OpenAI()
+#client = OpenAI()
 
 st.set_page_config(layout='wide')
 
