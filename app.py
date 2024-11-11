@@ -368,7 +368,6 @@ import concurrent.futures
 
 
 class OCRCache:
-    class OCRCache:
     def __init__(self, cache_dir="/tmp/ocr_cache"):
         """Initialize OCR cache system with cloud-friendly path"""
         self.cache_dir = cache_dir
