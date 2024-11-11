@@ -368,8 +368,9 @@ import concurrent.futures
 
 
 class OCRCache:
-    def __init__(self, cache_dir="./ocr_cache"):
-        """Initialize OCR cache system"""
+    class OCRCache:
+    def __init__(self, cache_dir="/tmp/ocr_cache"):
+        """Initialize OCR cache system with cloud-friendly path"""
         self.cache_dir = cache_dir
         self.cache_index_file = os.path.join(cache_dir, "cache_index.json")
         self.initialize_cache()
@@ -435,13 +436,11 @@ class OCRCache:
 
 def extract_text_with_ocr_cached(pdf_file_path, cache_system):
     """Extract text from PDF using cache if available"""
-    # Check cache first
     cached_text = cache_system.get_cached_text(pdf_file_path)
     if cached_text is not None:
         st.info(f"Using cached text for {os.path.basename(pdf_file_path)}")
         return cached_text
     
-    # If not in cache, perform OCR
     try:
         images = convert_from_path(
             pdf_file_path,
@@ -457,7 +456,6 @@ def extract_text_with_ocr_cached(pdf_file_path, cache_system):
         
         extracted_text = "\n".join(filter(None, results))
         
-        # Save to cache if extraction was successful
         if extracted_text.strip():
             cache_system.save_text_to_cache(pdf_file_path, extracted_text)
         
@@ -469,22 +467,18 @@ def extract_text_with_ocr_cached(pdf_file_path, cache_system):
     
 def optimize_image_for_ocr(image):
     """Optimize image for faster OCR processing"""
-    # Convert to grayscale if not already
     if image.mode != 'L':
         image = image.convert('L')
     
-    # Resize image if too large (maintain aspect ratio)
     max_dimension = 2000
     if max(image.size) > max_dimension:
         ratio = max_dimension / max(image.size)
         new_size = tuple(int(dim * ratio) for dim in image.size)
         image = image.resize(new_size, Image.LANCZOS)
     
-    # Improve contrast
     image = Image.fromarray(np.uint8(np.clip((np.array(image) * 1.2), 0, 255)))
-    
     return image
-
+            
 import os
 import pathlib
 from PIL import Image
@@ -538,20 +532,16 @@ def setup_tesseract(base_path="./Tesseract-OCR"):
     
 
 def process_page(img, language='hin+eng'):
-    """Process a single page with error handling and verification"""
+    """Process a single page with cloud-friendly configuration"""
     try:
-        # Verify Tesseract is properly initialized
-        if not hasattr(process_page, 'tesseract_initialized'):
-            process_page.tesseract_initialized = setup_tesseract()
-            if not process_page.tesseract_initialized:
-                raise Exception("Tesseract not properly initialized")
+        # Configure Tesseract path for cloud environment
+        pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
         
         # Optimize image
         img = optimize_image_for_ocr(img)
         
         # OCR with optimized settings and fallback
         try:
-            # Try with specified language
             custom_config = r'--oem 3 --psm 6 -c preserve_interword_spaces=1'
             text = pytesseract.image_to_string(
                 img, 
@@ -559,11 +549,10 @@ def process_page(img, language='hin+eng'):
                 config=custom_config
             )
         except Exception as lang_error:
-            # Fallback to English if specified language fails
             st.warning(f"Failed with language {language}, falling back to English")
             text = pytesseract.image_to_string(
                 img,
-                lang='hin+eng',
+                lang='eng',
                 config=custom_config
             )
         
@@ -653,10 +642,8 @@ def batch_process_pdfs_with_cache(selected_files, folder_path, progress_bar, sta
     combined_text = []
     processed_files = []
     
-    # Initialize cache system
     cache_system = OCRCache()
     
-    # Process files in smaller batches
     batch_size = 3
     for i in range(0, total_files, batch_size):
         batch = selected_files[i:i + batch_size]
@@ -678,7 +665,6 @@ def batch_process_pdfs_with_cache(selected_files, folder_path, progress_bar, sta
                         combined_text.append(text)
                         processed_files.append(file)
                     
-                    # Update progress
                     progress = (len(processed_files) / total_files)
                     progress_bar.progress(progress)
                     status_text.text(f"Processed {len(processed_files)}/{total_files} files")
