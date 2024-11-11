@@ -369,41 +369,22 @@ import concurrent.futures
 
 class OCRCache:
     def __init__(self, cache_dir="/tmp/ocr_cache"):
-        """Initialize OCR cache system with cloud-friendly path"""
         self.cache_dir = cache_dir
         self.cache_index_file = os.path.join(cache_dir, "cache_index.json")
         self.initialize_cache()
     
     def initialize_cache(self):
-        """Create cache directory and index if they don't exist"""
         os.makedirs(self.cache_dir, exist_ok=True)
         if not os.path.exists(self.cache_index_file):
             self.save_cache_index({})
     
     def get_file_hash(self, file_path):
-        """Generate hash of file content and modification time"""
         modification_time = os.path.getmtime(file_path)
         file_size = os.path.getsize(file_path)
-        with open(file_path, 'rb') as f:
-            file_content = f.read(1024 * 1024)  # Read first MB for hashing
-        hash_string = f"{file_path}_{modification_time}_{file_size}_{file_content}"
+        hash_string = f"{file_path}_{modification_time}_{file_size}"
         return hashlib.md5(hash_string.encode()).hexdigest()
     
-    def is_cache_valid(self, file_path, file_hash):
-        """Check if cache is valid for given file"""
-        cache_index = self.load_cache_index()
-        if file_hash in cache_index:
-            cache_file = os.path.join(self.cache_dir, f"{file_hash}.txt")
-            if os.path.exists(cache_file):
-                cached_info = cache_index[file_hash]
-                # Check if file path and modification time match
-                if (cached_info['file_path'] == file_path and 
-                    os.path.getmtime(file_path) == cached_info.get('modification_time')):
-                    return True
-        return False
-    
     def load_cache_index(self):
-        """Load cache index from file"""
         try:
             with open(self.cache_index_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
@@ -411,119 +392,97 @@ class OCRCache:
             return {}
     
     def save_cache_index(self, index):
-        """Save cache index to file"""
-        try:
-            with open(self.cache_index_file, 'w', encoding='utf-8') as f:
-                json.dump(index, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            st.warning(f"Could not save cache index: {str(e)}")
+        with open(self.cache_index_file, 'w', encoding='utf-8') as f:
+            json.dump(index, f, ensure_ascii=False, indent=2)
     
     def get_cached_text(self, file_path):
-        """Retrieve cached text from memory or file"""
-        try:
-            file_hash = self.get_file_hash(file_path)
-            
-            # First check if cache is valid
-            if not self.is_cache_valid(file_path, file_hash):
-                return None
-            
-            # Try memory cache first
-            if file_hash in st.session_state.ocr_cache:
-                st.success(f"Using memory cache for {os.path.basename(file_path)}")
-                return st.session_state.ocr_cache[file_hash]
-            
-            # Try file cache
+        file_hash = self.get_file_hash(file_path)
+        cache_index = self.load_cache_index()
+        
+        if file_hash in cache_index:
             cache_file = os.path.join(self.cache_dir, f"{file_hash}.txt")
             if os.path.exists(cache_file):
                 try:
                     with open(cache_file, 'r', encoding='utf-8') as f:
-                        text = f.read()
-                        # Store in memory cache for future use
-                        st.session_state.ocr_cache[file_hash] = text
-                        st.success(f"Using file cache for {os.path.basename(file_path)}")
-                        return text
-                except Exception as e:
-                    st.warning(f"Error reading cache file: {str(e)}")
+                        return f.read()
+                except Exception:
                     return None
-            return None
-        except Exception as e:
-            st.warning(f"Cache retrieval error: {str(e)}")
-            return None
-
+        return None
+    
     def save_text_to_cache(self, file_path, text):
-        """Save extracted text to both memory and file cache"""
-        try:
-            file_hash = self.get_file_hash(file_path)
-            
-            # Check if already cached and valid
-            if self.is_cache_valid(file_path, file_hash):
-                return  # Skip if already properly cached
-            
-            # Save to memory cache
-            st.session_state.ocr_cache[file_hash] = text
-            
-            # Save to file cache
-            cache_file = os.path.join(self.cache_dir, f"{file_hash}.txt")
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                f.write(text)
-            
-            # Update cache index
-            cache_index = self.load_cache_index()
-            cache_index[file_hash] = {
-                'file_path': file_path,
-                'modification_time': os.path.getmtime(file_path),
-                'cached_date': datetime.now().isoformat(),
-                'cache_file': f"{file_hash}.txt"
-            }
-            self.save_cache_index(cache_index)
-            st.success(f"Cached text for {os.path.basename(file_path)}")
-            
-        except Exception as e:
-            st.warning(f"Could not save to cache: {str(e)}")
+        file_hash = self.get_file_hash(file_path)
+        cache_index = self.load_cache_index()
+        
+        cache_file = os.path.join(self.cache_dir, f"{file_hash}.txt")
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            f.write(text)
+        
+        cache_index[file_hash] = {
+            'file_path': file_path,
+            'cached_date': datetime.now().isoformat(),
+            'cache_file': f"{file_hash}.txt"
+        }
+        self.save_cache_index(cache_index)
 
 def extract_text_with_ocr_cached(pdf_file_path, cache_system):
     """Extract text from PDF using cache if available"""
+    # Check cache first
     cached_text = cache_system.get_cached_text(pdf_file_path)
     if cached_text is not None:
         st.info(f"Using cached text for {os.path.basename(pdf_file_path)}")
         return cached_text
     
     try:
+        # Convert PDF to images with optimized settings
+        st.write(f"Converting PDF: {os.path.basename(pdf_file_path)}")
         images = convert_from_path(
             pdf_file_path,
-            dpi=200,
+            dpi=200,  # Reduced DPI for faster processing
             thread_count=multiprocessing.cpu_count(),
             grayscale=True,
-            size=(1800, None)
+            size=(1800, None)  # Consistent with optimize_image_for_ocr
         )
         
+        total_pages = len(images)
+        st.write(f"Total pages to process: {total_pages}")
+        
+        # Prepare arguments for parallel processing
+        process_args = [(img, i+1, total_pages) for i, img in enumerate(images)]
+        
+        # Process pages in parallel using ProcessPoolExecutor
         max_workers = min(multiprocessing.cpu_count(), len(images))
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            results = list(executor.map(process_page, images))
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(process_page, process_args))
         
-        extracted_text = "\n".join(filter(None, results))
+        # Combine results
+        extracted_text = "\n\n".join(filter(None, results))
         
+        # Save to cache if extraction was successful
         if extracted_text.strip():
             cache_system.save_text_to_cache(pdf_file_path, extracted_text)
         
         return extracted_text
     
     except Exception as e:
-        st.error(f"Error during OCR extraction: {str(e)}")
+        st.error(f"Error processing {os.path.basename(pdf_file_path)}: {str(e)}")
         return ""
     
 def optimize_image_for_ocr(image):
     """Optimize image for faster OCR processing"""
+    # Convert to grayscale if not already
     if image.mode != 'L':
         image = image.convert('L')
     
-    max_dimension = 2000
+    # Resize image if too large while maintaining aspect ratio
+    max_dimension = 1800  # Reduced from 2000 for faster processing
     if max(image.size) > max_dimension:
         ratio = max_dimension / max(image.size)
         new_size = tuple(int(dim * ratio) for dim in image.size)
         image = image.resize(new_size, Image.LANCZOS)
     
+    # Enhance contrast
     image = Image.fromarray(np.uint8(np.clip((np.array(image) * 1.2), 0, 255)))
+    
     return image
 
 import os
@@ -562,34 +521,31 @@ def setup_tesseract(base_path="./Tesseract-OCR"):
         return False
     
 
-def process_page(img, language='hin+eng'):
-    """Process a single page with cloud-friendly configuration"""
+def process_page(args):
+    """Process a single page with optimized settings"""
+    img, page_num, total_pages = args
     try:
-        # Configure Tesseract path for cloud environment
+        start_time = time.time()
+        
+        # Configure Tesseract
         pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
         
         # Optimize image
         img = optimize_image_for_ocr(img)
         
-        # OCR with optimized settings and fallback
-        try:
-            custom_config = r'--oem 3 --psm 6 -c preserve_interword_spaces=1'
-            text = pytesseract.image_to_string(
-                img, 
-                lang=language,
-                config=custom_config
-            )
-        except Exception as lang_error:
-            st.warning(f"Failed with language {language}, falling back to English")
-            text = pytesseract.image_to_string(
-                img,
-                lang='eng',
-                config=custom_config
-            )
+        # OCR with optimized settings
+        custom_config = r'--oem 3 --psm 6 -c preserve_interword_spaces=1'
+        text = pytesseract.image_to_string(img, lang='eng+hin', config=custom_config)
+        
+        processing_time = time.time() - start_time
+        
+        # Update progress
+        progress_msg = f"Processed page {page_num}/{total_pages} in {processing_time:.2f}s"
+        st.write(progress_msg)
         
         return text.strip()
     except Exception as e:
-        st.error(f"Error processing page: {str(e)}")
+        st.error(f"Error processing page {page_num}: {str(e)}")
         return ""
 
 def optimize_image_for_ocr(image):
@@ -689,36 +645,39 @@ def batch_process_pdfs_with_cache(selected_files, folder_path, progress_bar, sta
     total_files = len(selected_files)
     combined_text = []
     processed_files = []
+    start_time = time.time()
     
+    # Initialize cache system
     cache_system = OCRCache()
     
-    batch_size = 3
+    # Process files in smaller batches to manage memory
+    batch_size = 2  # Reduced batch size
     for i in range(0, total_files, batch_size):
         batch = selected_files[i:i + batch_size]
         
-        with ThreadPoolExecutor(max_workers=batch_size) as executor:
-            future_to_file = {
-                executor.submit(
-                    extract_text_with_ocr_cached,
-                    os.path.join(folder_path, file + '.pdf'),
-                    cache_system
-                ): file for file in batch
-            }
-            
-            for future in concurrent.futures.as_completed(future_to_file):
-                file = future_to_file[future]
-                try:
-                    text = future.result()
-                    if text.strip():
-                        combined_text.append(text)
-                        processed_files.append(file)
-                    
-                    progress = (len(processed_files) / total_files)
-                    progress_bar.progress(progress)
-                    status_text.text(f"Processed {len(processed_files)}/{total_files} files")
-                    
-                except Exception as e:
-                    st.warning(f"Error processing {file}: {str(e)}")
+        for file in batch:
+            try:
+                pdf_path = os.path.join(folder_path, f"{file}.pdf")
+                status_text.text(f"Processing {file}.pdf ({len(processed_files) + 1}/{total_files})")
+                
+                text = extract_text_with_ocr_cached(pdf_path, cache_system)
+                if text.strip():
+                    combined_text.append(text)
+                    processed_files.append(file)
+                
+                # Update progress
+                progress = (len(processed_files) / total_files)
+                progress_bar.progress(progress)
+                
+            except Exception as e:
+                st.warning(f"Error processing {file}: {str(e)}")
+        
+        # Clear memory after each batch
+        import gc
+        gc.collect()
+    
+    total_time = time.time() - start_time
+    st.write(f"Total processing time: {total_time:.2f} seconds")
     
     return combined_text, processed_files    
 
@@ -774,7 +733,21 @@ def initialize_chroma():
     # Chroma DB configuration (you can use any other vector DB like Pinecone, etc.)
     chroma_vector_store = Chroma(persist_directory="./chroma_db", embedding_function=OpenAIEmbeddings(openai_api_key=openai_api_key2))
     return chroma_vector_store
-
+@st.cache_resource
+def get_openai_chain():
+    """Initialize OpenAI chain with caching"""
+    openai_api_key = st.secrets["OPENAI_API_KEY"]
+    return ConversationChain(
+        llm=ChatOpenAI(
+            model="gpt-4o",
+            temperature=0.7,
+            api_key=openai_api_key
+        )
+    )            
+            
+if 'final_text' not in st.session_state:
+    st.session_state.final_text = None
+            
 def create_excel(data, filename="questions.xlsx"):
     # Convert data to a DataFrame with specified columns
     df = pd.DataFrame(data, columns=["Unit", "Level", "Topic", "Question", "Option 1", "Option 2", "Option 3", "Option 4", "Correct Answer"])
@@ -987,7 +960,7 @@ if st.session_state.teach == 'Teachers':
             
                                         st.session_state.llm = ConversationChain(
                                             llm=ChatOpenAI(
-                                                model="gpt-4",
+                                                model="gpt-4o",
                                                 temperature=0.7,
                                                 api_key=openai_api_key
                                             )
